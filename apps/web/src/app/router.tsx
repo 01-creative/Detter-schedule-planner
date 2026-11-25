@@ -19,6 +19,8 @@ const MindMapPage = lazy(() => import("@/pages/MindMapPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const SetupPage = lazy(() => import("@/pages/SetupPage"));
+// 系统分享菜单落到这里：?title=&text=&url= 直接进收件箱
+const ShareTarget = lazy(() => import("@/features/capture/ShareTarget"));
 
 export function AppRouter() {
   return (
@@ -50,6 +52,8 @@ export function AppRouter() {
           <Route path="focus" element={<FocusPage />} />
           <Route path="mindmap" element={<MindMapPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          {/* /share 走 AppShell：分享进来时用户能看到「已收下」并继续待在应用里 */}
+          <Route path="share" element={<ShareTarget />} />
         </Route>
       </Route>
 
