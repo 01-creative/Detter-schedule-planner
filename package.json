@@ -1,0 +1,33 @@
+{
+  "name": "detter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Detter — 本地优先的四象限日程管理器：四象限 / OKR / KPI / 番茄钟 / 快速捕获 / 思维导图 / AI 接口",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @detter/web --filter @detter/api dev",
+    "dev:web": "pnpm --filter @detter/web dev",
+    "dev:api": "pnpm --filter @detter/api dev",
+    "build": "pnpm --filter @detter/web build",
+    "typecheck": "pnpm -r --workspace-concurrency=4 typecheck",
+    "test": "pnpm -r --workspace-concurrency=4 test",
+    "test:watch": "pnpm --filter @detter/web test:watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9",
+    "@types/node": "^22.20.7",
+    "eslint": "^9.39.5",
+    "prettier": "^3.10.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8",
+    "vitest": "^3.2.7"
+  }
+}

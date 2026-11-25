@@ -1,0 +1,240 @@
+# 设计系统 · Detter
+
+> 气质关键词：**暖白、柔和、留白、微光、有呼吸感**。
+> 反面清单：不要玻璃拟态滥用、不要霓虹、不要重投影、不要纯黑白极简到没有温度、不要圆角过大（>24px）的"果冻"感。
+
+设计不是装饰。这个产品每天要被打开 10 次以上，**过目不忘不如久看不累**。
+
+---
+
+## 1. 颜色
+
+### 1.1 基础层
+
+| 令牌 | 值 | 用途 |
+| --- | --- | --- |
+| `--bg` | `#FAFAF9` | 页面底色（暖白，比纯白舒服） |
+| `--bg-tint-1` | `radial-gradient(1200px 600px at 12% -10%, #EEF2FF 0%, transparent 60%)` | 左上冷光 |
+| `--bg-tint-2` | `radial-gradient(900px 500px at 100% 0%, #FDF2F8 0%, transparent 55%)` | 右上暖光 |
+| `--surface` | `rgba(255,255,255,0.78)` | 卡片表面 |
+| `--surface-solid` | `#FFFFFF` | 弹层/对话框 |
+| `--surface-sunken` | `#F4F4F3` | 内嵌区域 |
+| `--border` | `rgba(23,23,28,0.07)` | 常规描边 |
+| `--border-strong` | `rgba(23,23,28,0.12)` | 强调描边 |
+
+### 1.2 墨色（文字）
+
+| 令牌 | 值 | 用途 |
+| --- | --- | --- |
+| `--ink-900` | `#17171C` | 标题 |
+| `--ink-700` | `#3F3F49` | 正文 |
+| `--ink-500` | `#71717F` | 次要信息 |
+| `--ink-300` | `#A1A1AE` | 占位符 / 禁用 |
+
+### 1.3 品牌与语义
+
+| 令牌 | 值 |
+| --- | --- |
+| `--accent` | `#6355F6` |
+| `--accent-hover` | `#5546E8` |
+| `--accent-soft` | `#EFEDFE` |
+| `--accent-gradient` | `linear-gradient(135deg, #7C6CF8 0%, #6355F6 55%, #5B8DEF 100%)` |
+| `--success` | `#10B981` |
+| `--warning` | `#F59E0B` |
+| `--danger` | `#EF4444` |
+| `--info` | `#0EA5E9` |
+
+### 1.4 四象限
+
+| 象限 | 渐变（上→下） | 强调色 | 语义 |
+| --- | --- | --- | --- |
+| Q1 重要且紧急 | `#FFF1F2 → #FFE4E6` | `#E11D48` | 马上做 |
+| Q2 重要不紧急 | `#ECFDF5 → #D1FAE5` | `#059669` | 安排时间 |
+| Q3 紧急不重要 | `#FFFBEB → #FEF3C7` | `#D97706` | 快速清掉 |
+| Q4 不重要不紧急 | `#F8FAFC → #E2E8F0` | `#64748B` | 少做 |
+
+> 象限底色**极淡**，只作为空间提示；任务卡片本身是白色，避免大面积彩色噪点。
+
+### 1.5 深色模式
+
+`[data-theme="dark"]` 覆盖：
+
+```
+--bg: #0E0E12
+--surface: rgba(28,28,34,0.72)
+--surface-solid: #1C1C22
+--surface-sunken: #16161B
+--border: rgba(255,255,255,0.08)
+--border-strong: rgba(255,255,255,0.14)
+--ink-900: #F5F5F7
+--ink-700: #D4D4DA
+--ink-500: #9A9AA5
+--ink-300: #6B6B76
+--accent: #8B7CF8
+--accent-soft: rgba(139,124,248,0.16)
+```
+
+深色下象限渐变要降饱和 + 降明度（例：Q1 `#3A1F26 → #2A171C`），保持可辨识但不要发光。
+
+---
+
+## 2. 字体与排版
+
+```css
+--font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC",
+             "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+--font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+```
+
+| 层级 | 字号/行高 | 字重 | 用途 |
+| --- | --- | --- | --- |
+| display | 30/38 | 600 | 页面主标题（少用） |
+| h1 | 22/30 | 600 | 区块标题 |
+| h2 | 17/24 | 600 | 卡片组标题 |
+| body | 14/22 | 400 | 正文 |
+| body-strong | 14/22 | 550 | 强调 |
+| caption | 12/18 | 500 | 辅助信息 |
+| micro | 11/16 | 500 | 标签/计数 |
+
+- 中文不要用 `letter-spacing`，英文小标题可加 `0.01em`。
+- 数字（番茄钟、KPI、时间）用 `font-variant-numeric: tabular-nums`。
+
+---
+
+## 3. 空间、圆角、阴影
+
+```
+间距基数 4px：4 8 12 16 20 24 32 40 48 64
+--r-sm 8  --r-md 12  --r-lg 16  --r-xl 20  --r-2xl 24  --r-full 999
+```
+
+阴影（低饱和、大模糊、负扩散）：
+
+```css
+--shadow-1: 0 1px 2px rgba(24,24,40,.04), 0 1px 1px rgba(24,24,40,.03);
+--shadow-2: 0 4px 12px -4px rgba(24,24,40,.08), 0 2px 4px -2px rgba(24,24,40,.04);
+--shadow-3: 0 16px 40px -16px rgba(24,24,40,.16), 0 4px 12px -6px rgba(24,24,40,.08);
+--shadow-accent: 0 0 0 1px rgba(99,85,246,.14), 0 10px 28px -10px rgba(99,85,246,.40);
+```
+
+卡片默认只有 `--shadow-1` + `--border`；hover 升到 `--shadow-2` 并 `translateY(-1px)`。**不要**给每个卡片都上重投影。
+
+毛玻璃只用在一处：顶部工具条与弹层背板（`backdrop-filter: blur(14px) saturate(1.4)`）。
+
+---
+
+## 4. 动效
+
+```css
+--ease-out: cubic-bezier(.22,1,.36,1);
+--ease-in-out: cubic-bezier(.4,0,.2,1);
+--dur-1: 120ms;  /* hover / 颜色 */
+--dur-2: 180ms;  /* 元素出现 */
+--dur-3: 260ms;  /* 面板 / 对话框 */
+--dur-4: 400ms;  /* 页面切换 */
+```
+
+规则：
+1. **只动 transform 与 opacity**；不要动 width/height/top/left（会掉帧）。
+2. 任务卡片拖拽：`scale(1.03)` + `--shadow-3` + `rotate(0.4deg)`，松手用 spring（stiffness 420 / damping 34）。
+3. 完成一件事：勾选圆圈 `scale 0.8 → 1.15 → 1`，卡片 180ms 淡出并上移，其余卡片用 layout 动画补位。
+4. 面板出现：`translateY(6px) + opacity 0 → 1`，180ms。
+5. 尊重 `prefers-reduced-motion: reduce`：全部降级为 `opacity` 瞬时切换。
+
+---
+
+## 5. 布局
+
+```
+断点：sm 640 / md 768 / lg 1024 / xl 1280 / 2xl 1536
+内容最大宽度 1440，页面左右留白 ≥ 24（移动端 16）
+```
+
+### 桌面（≥1024）
+
+```
+┌────┬─────────────────────────────────────────┬──────────────┐
+│ 导 │  顶部工具条 56px                          │              │
+│ 航 ├─────────────────────────────────────────┤  目标栏 320px │
+│ 76 │                                          │  (常驻可折叠)  │
+│ px │  主内容（四象限 2×2 / 其它页面）           │              │
+│    │                                          │              │
+└────┴─────────────────────────────────────────┴──────────────┘
+```
+
+### 移动（<768）
+
+- 顶部 52px：当前视图标题 + 同步点 + 头像
+- 底部 tab 64px：四象限 / 收件箱 / 日历 / 专注 / 更多
+- 右下 FAB：56px 圆形，`--accent-gradient`，`--shadow-accent`，按下 `scale(.94)`
+- 四象限改为纵向分区 + 顶部吸顶分段控件（Q1/Q2/Q3/Q4 快速跳转），每个分区可折叠
+
+---
+
+## 6. 核心组件规范
+
+### 6.1 Button
+
+| 变体 | 背景 | 文字 | 边框 |
+| --- | --- | --- | --- |
+| primary | `--accent-gradient` | white | 无，`--shadow-accent` |
+| secondary | `--surface-solid` | `--ink-900` | `--border` |
+| ghost | transparent | `--ink-700` | 无，hover `--surface-sunken` |
+| danger | `#FEF2F2` | `--danger` | `rgba(239,68,68,.2)` |
+
+尺寸：sm 28px / md 36px / lg 44px；圆角 `--r-md`；图标按钮正方形。
+按下 `transform: scale(.97)`，120ms。
+
+### 6.2 TaskCard（最关键）
+
+- 最小高度 44px，padding 10px 12px，圆角 `--r-lg`，白底，`--shadow-1`
+- 左侧 3px 竖条 = 所属目标颜色（无目标则透明）
+- 第一行：标题（14/20，550，最多 2 行，超出省略）
+- 第二行（有则显示）：时间 chip、地点、标签 chips，11.5px，`--ink-500`
+- 右上角 hover 出现「⋯」菜单（完成 / 移动到象限 / 设置坐标 / 删除）
+- 完成态：文字删除线 + 60% 透明 + 左侧竖条变灰
+- 拖拽中：`cursor: grabbing`，源位置留虚线占位
+
+### 6.3 QuadrantCell
+
+- 圆角 `--r-xl`，渐变背景，内描边 `rgba(255,255,255,.6)`
+- 头部：象限短名（15/22, 600）+ 计数 badge + 「+」（hover 显示）+ 一句极淡的 `hint`（12px，40% 透明）
+- 内容区独立滚动，`scrollbar-width: thin`
+- 空态：一句 13px 提示 + 一个淡色插画（可用 CSS 渐变圆斑实现，不引入图片）
+
+### 6.4 GoalRail（右侧目标栏）
+
+- 顶部三个 tab：`一次性 / 周期 / 模板`（下划线滑动指示器 180ms）
+- 目标项：左侧圆点（目标色）+ 标题 + 右侧进度或次数；拖拽可拖到象限
+- 底部「+ 新建目标」
+- 模板项右侧有「铺开」按钮（禁用态说明"拖到象限即可创建"）
+
+### 6.5 CapturePanel（快速记录）
+
+- `Ctrl/Cmd+K` 呼出，居中偏上（top 18vh），宽 640，圆角 `--r-xl`
+- 单行输入，placeholder：「明天下午3点 交高数作业 #作业 在教三」
+- 输入时下方实时显示解析 chips：`明天 15:00` `#作业` `@高数` `40分钟`，无法解析的部分保持原文
+- 底部：`Enter 记录` / `Esc 取消` / `⌘⇧Enter 直接加入四象限 Q1`
+- 记录成功后面板**不关闭**（连续捕获），顶部短暂显示「已收进盒子 ✓」
+
+---
+
+## 7. 无障碍与细节
+
+1. 焦点环：`outline: 2px solid var(--accent); outline-offset: 2px`，**不要** `outline: none`。
+2. 所有可点击元素最小 44×44 命中区（移动端）。
+3. 对比度：正文 ≥ 4.5:1，大字 ≥ 3:1。
+4. 图标按钮必须带 `aria-label`；拖拽必须提供键盘替代（在详情面板里改象限）。
+5. 滚动条：8px 宽，圆角，颜色 `--border-strong`。
+6. 禁用 `user-select` 的区域：导航、按钮；任务正文允许选中复制。
+
+---
+
+## 8. 交付检查表（T02 / T13 验收用）
+
+- [ ] `tokens.css` 覆盖浅色 + 深色两套，无遗漏变量
+- [ ] 所有组件在 375 / 768 / 1280 三个宽度下无溢出、无重叠
+- [ ] 任务卡片 hover / 拖拽 / 完成三态都有动效且不卡
+- [ ] 页面切换有 120–180ms 的淡入，不刺眼
+- [ ] 键盘走查：Tab 能走完主流程，Esc 能关弹层
+- [ ] `prefers-reduced-motion` 下无动画

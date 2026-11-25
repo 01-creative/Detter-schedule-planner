@@ -1,0 +1,28 @@
+{
+  "name": "@detter/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Detter 领域模型、同步协议与纯函数工具（前后端共享，禁止引入 DOM/网络依赖）",
+  "exports": {
+    ".": "./src/index.ts",
+    "./entities": "./src/entities.ts",
+    "./sync": "./src/sync.ts",
+    "./nlp": "./src/nlp.ts",
+    "./time": "./src/time.ts",
+    "./quadrant": "./src/quadrant.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
