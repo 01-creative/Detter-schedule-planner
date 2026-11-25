@@ -4,13 +4,13 @@
  * 这里只放「纯」的东西：类型、schema、纯函数。
  * 不允许出现 DOM、fetch、IndexedDB、process.env 等环境依赖。
  */
-export * from "./api";
-export * from "./entities";
-export * from "./ids";
-export * from "./nlp";
-export * from "./quadrant";
-export * from "./sync";
-export * from "./time";
+export * from "./api.ts";
+export * from "./entities.ts";
+export * from "./ids.ts";
+export * from "./nlp.ts";
+export * from "./quadrant.ts";
+export * from "./sync.ts";
+export * from "./time.ts";
 
 /** 应用版本号（与 package.json 保持同步，构建时由 vite 注入覆盖） */
 export const APP_VERSION = "0.1.0";

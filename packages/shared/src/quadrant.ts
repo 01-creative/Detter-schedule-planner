@@ -1,4 +1,4 @@
-import type { Quadrant } from "./entities";
+import type { Quadrant } from "./entities.ts";
 
 /**
  * 四象限判定。

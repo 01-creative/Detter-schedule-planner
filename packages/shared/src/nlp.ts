@@ -1,5 +1,5 @@
-import type { ParsedDraft, Quadrant } from "./entities";
-import { addDays, endOfDay, startOfDay } from "./time";
+import type { ParsedDraft, Quadrant } from "./entities.ts";
+import { addDays, endOfDay, startOfDay } from "./time.ts";
 
 /**
  * 快速捕获的自然语言解析器（纯函数、零依赖、可单测）。

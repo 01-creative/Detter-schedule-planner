@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ENTITY_NAMES, type EntityName } from "./entities";
+import { ENTITY_NAMES, type EntityName } from "./entities.ts";
 
 /**
  * 同步协议 v1（本地优先 / 离线优先）。

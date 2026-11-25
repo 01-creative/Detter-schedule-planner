@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CaptureSourceSchema, KpiPeriodSchema, OkrPeriodSchema, QuadrantSchema, TASK_STATUSES } from "./entities";
+import { CaptureSourceSchema, KpiPeriodSchema, OkrPeriodSchema, QuadrantSchema, TASK_STATUSES } from "./entities.ts";
 
 /**
  * HTTP / MCP 接口契约（v1）。
