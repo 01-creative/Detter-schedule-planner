@@ -49,3 +49,6 @@ data/
 *.sqlite
 *.sqlite3
 *.db
+# QA artifacts
+.qa/
+.tmp-*/

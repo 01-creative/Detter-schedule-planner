@@ -1,0 +1,73 @@
+/* Detter 应用层样式：只放 Tailwind 入口、内容扫描路径与「应用才有」的组合样式。 */
+
+/* Tailwind v4 没有 tailwind.config.js：@theme 令牌与工具类都由 CSS 驱动。
+   设计令牌在 packages/ui/src/styles/tokens.css，这里必须用 @import 引入，
+   因为 @theme 与工具类要在同一次编译里合并，分开 import 会拿不到自定义颜色。 */
+@import "tailwindcss";
+@import "../../../../packages/ui/src/styles/tokens.css";
+
+/* Tailwind v4 默认只扫描 CSS 所在项目（apps/web），
+   工作区里的 packages/ui 与 src 都要显式登记，否则组件类名会被裁掉。 */
+@source "../../../../packages/ui/src";
+@source "../../src";
+
+@layer base {
+  /* 移动端底部有 tab bar，用 dvh 而不是 vh，避免浏览器地址栏收起时出现跳动 */
+  html,
+  body,
+  #root {
+    min-height: 100dvh;
+  }
+
+  body {
+    /* 光斑是固定的背景层，不随页面滚动 */
+    background-image: var(--bg-tint-1), var(--bg-tint-2);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+
+  /* 桌面端滚动条出现/消失不该让内容左右跳 */
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  @media (max-width: 767px) {
+    html {
+      scrollbar-gutter: auto;
+    }
+  }
+}
+
+@layer components {
+  /* 象限格：底色来自 data-q，深浅色各自一套渐变 */
+  .quadrant-cell {
+    --cell-from: transparent;
+    --cell-to: transparent;
+    background-image: linear-gradient(180deg, var(--cell-from) 0%, var(--cell-to) 100%);
+  }
+
+  .quadrant-cell[data-q="1"] {
+    --cell-from: var(--q1-from);
+    --cell-to: var(--q1-to);
+  }
+
+  .quadrant-cell[data-q="2"] {
+    --cell-from: var(--q2-from);
+    --cell-to: var(--q2-to);
+  }
+
+  .quadrant-cell[data-q="3"] {
+    --cell-from: var(--q3-from);
+    --cell-to: var(--q3-to);
+  }
+
+  .quadrant-cell[data-q="4"] {
+    --cell-from: var(--q4-from);
+    --cell-to: var(--q4-to);
+  }
+
+  /* 表格/数字列对齐 */
+  .numeric {
+    font-variant-numeric: tabular-nums;
+  }
+}

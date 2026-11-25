@@ -1,0 +1,411 @@
+/* ==========================================================================
+   Detter · 设计令牌（唯一来源）
+   规范：docs/architecture/04-DESIGN-SYSTEM.md
+
+   为什么所有颜色都先写成裸变量、再在 @theme 里映射一层：
+   深浅色只需要覆盖 `:root` 上的一层变量，组件里永远写 bg-surface / text-ink-700，
+   不必出现 dark: 前缀，也就不会出现「某个角落忘了写 dark」的漏网之鱼。
+   ========================================================================== */
+
+/* 用 [data-theme="dark"] 而不是 .dark：主题是文档级状态，挂在 <html> 上，
+   index.html 里的内联脚本能在首帧之前就定好，避免白屏闪烁。 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* -------------------------------------------------------------------------- */
+/*                                  浅色（默认）                                */
+/* -------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* 基础层 */
+  --bg: #fafaf9;
+  --bg-tint-1: radial-gradient(1200px 600px at 12% -10%, #eef2ff 0%, transparent 60%);
+  --bg-tint-2: radial-gradient(900px 500px at 100% 0%, #fdf2f8 0%, transparent 55%);
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-solid: #ffffff;
+  --surface-sunken: #f4f4f3;
+  --border: rgba(23, 23, 28, 0.07);
+  --border-strong: rgba(23, 23, 28, 0.12);
+
+  /* 墨色（文字） */
+  --ink-900: #17171c;
+  --ink-700: #3f3f49;
+  --ink-500: #71717f;
+  --ink-300: #a1a1ae;
+
+  /* 品牌 */
+  --accent: #6355f6;
+  --accent-hover: #5546e8;
+  --accent-soft: #efedfe;
+  --accent-gradient: linear-gradient(135deg, #7c6cf8 0%, #6355f6 55%, #5b8def 100%);
+  --on-accent: #ffffff;
+
+  /* 语义色：主色用于图标/描边，-ink 用于小字（保证 4.5:1），-soft 用于浅底 */
+  --success: #10b981;
+  --success-ink: #047857;
+  --success-soft: #ecfdf5;
+  --warning: #f59e0b;
+  --warning-ink: #b45309;
+  --warning-soft: #fffbeb;
+  --danger: #ef4444;
+  --danger-ink: #b91c1c;
+  --danger-soft: #fef2f2;
+  --info: #0ea5e9;
+  --info-ink: #0369a1;
+  --info-soft: #f0f9ff;
+
+  /* 四象限：底色极淡，只作为空间提示 */
+  --q1-from: #fff1f2;
+  --q1-to: #ffe4e6;
+  --q1-accent: #e11d48;
+  --q1-soft: rgba(225, 29, 72, 0.09);
+  --q2-from: #ecfdf5;
+  --q2-to: #d1fae5;
+  --q2-accent: #059669;
+  --q2-soft: rgba(5, 150, 105, 0.09);
+  --q3-from: #fffbeb;
+  --q3-to: #fef3c7;
+  --q3-accent: #d97706;
+  --q3-soft: rgba(217, 119, 6, 0.1);
+  --q4-from: #f8fafc;
+  --q4-to: #e2e8f0;
+  --q4-accent: #64748b;
+  --q4-soft: rgba(100, 116, 139, 0.1);
+
+  /* 卡片内描边（象限格那种「内亮边」） */
+  --cell-inner-ring: rgba(255, 255, 255, 0.72);
+  --scrim: rgba(23, 23, 28, 0.24);
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  深色覆盖                                   */
+/* -------------------------------------------------------------------------- */
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0e0e12;
+  --bg-tint-1: radial-gradient(1200px 600px at 12% -10%, rgba(99, 85, 246, 0.14) 0%, transparent 62%);
+  --bg-tint-2: radial-gradient(900px 500px at 100% 0%, rgba(219, 39, 119, 0.09) 0%, transparent 58%);
+  --surface: rgba(28, 28, 34, 0.72);
+  --surface-solid: #1c1c22;
+  --surface-sunken: #16161b;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  --ink-900: #f5f5f7;
+  --ink-700: #d4d4da;
+  --ink-500: #9a9aa5;
+  --ink-300: #6b6b76;
+
+  --accent: #8b7cf8;
+  --accent-hover: #9d8ffa;
+  --accent-soft: rgba(139, 124, 248, 0.16);
+  /* 深色下渐变整体压暗一档：白字落在上面仍有 ≥4.5:1 */
+  --accent-gradient: linear-gradient(135deg, #6f5ff0 0%, #5b4ce0 55%, #4c7fe0 100%);
+  --on-accent: #ffffff;
+
+  --success: #34d399;
+  --success-ink: #6ee7b7;
+  --success-soft: rgba(52, 211, 153, 0.13);
+  --warning: #fbbf24;
+  --warning-ink: #fcd34d;
+  --warning-soft: rgba(251, 191, 36, 0.13);
+  --danger: #f87171;
+  --danger-ink: #fca5a5;
+  --danger-soft: rgba(248, 113, 113, 0.13);
+  --info: #38bdf8;
+  --info-ink: #7dd3fc;
+  --info-soft: rgba(56, 189, 248, 0.13);
+
+  /* 降饱和 + 降明度：能分辨四个象限，但不发光 */
+  --q1-from: #3a1f26;
+  --q1-to: #2a171c;
+  --q1-accent: #fb7185;
+  --q1-soft: rgba(251, 113, 133, 0.14);
+  --q2-from: #172e26;
+  --q2-to: #12241e;
+  --q2-accent: #34d399;
+  --q2-soft: rgba(52, 211, 153, 0.14);
+  --q3-from: #33270f;
+  --q3-to: #261d0c;
+  --q3-accent: #fbbf24;
+  --q3-soft: rgba(251, 191, 36, 0.14);
+  --q4-from: #22262e;
+  --q4-to: #191c22;
+  --q4-accent: #94a3b8;
+  --q4-soft: rgba(148, 163, 184, 0.14);
+
+  --cell-inner-ring: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(0, 0, 0, 0.56);
+}
+
+/* -------------------------------------------------------------------------- */
+/*                          Tailwind v4 主题映射（不随主题变）                   */
+/* -------------------------------------------------------------------------- */
+
+@theme {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC",
+    "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  /* 排版层级：display / h1 / h2 / body / caption / micro（见设计规范 §2） */
+  --text-display: 30px;
+  --text-display--line-height: 38px;
+  --text-display--font-weight: 600;
+  --text-h1: 22px;
+  --text-h1--line-height: 30px;
+  --text-h1--font-weight: 600;
+  --text-h2: 17px;
+  --text-h2--line-height: 24px;
+  --text-h2--font-weight: 600;
+  --text-body: 14px;
+  --text-body--line-height: 22px;
+  --text-caption: 12px;
+  --text-caption--line-height: 18px;
+  --text-caption--font-weight: 500;
+  --text-micro: 11px;
+  --text-micro--line-height: 16px;
+  --text-micro--font-weight: 500;
+
+  --font-weight-strong: 550;
+
+  /* 圆角：设计规范 §3（T02 任务书里 --r-xl 写成 24，以设计规范 20/24 两档为准） */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-2xl: 24px;
+  --r-full: 999px;
+
+  /* 阴影：低饱和、大模糊、负扩散 */
+  --shadow-1: 0 1px 2px rgba(24, 24, 40, 0.04), 0 1px 1px rgba(24, 24, 40, 0.03);
+  --shadow-2: 0 4px 12px -4px rgba(24, 24, 40, 0.08), 0 2px 4px -2px rgba(24, 24, 40, 0.04);
+  --shadow-3: 0 16px 40px -16px rgba(24, 24, 40, 0.16), 0 4px 12px -6px rgba(24, 24, 40, 0.08);
+  --shadow-accent: 0 0 0 1px rgba(99, 85, 246, 0.14), 0 10px 28px -10px rgba(99, 85, 246, 0.4);
+
+  /* 动效 */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 260ms;
+  --dur-4: 400ms;
+
+  /* 移动端最小命中区（设计规范 §7.2） */
+  --tap-min: 44px;
+
+  --animate-pulse-soft: pulse-soft 1.6s var(--ease-in-out) infinite;
+  --animate-driven-spin: driven-spin 720ms linear infinite;
+}
+
+/* 颜色映射：inline 让工具类直接落到裸变量上，深色覆盖在任意节点都生效 */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-solid: var(--surface-solid);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-ink-900: var(--ink-900);
+  --color-ink-700: var(--ink-700);
+  --color-ink-500: var(--ink-500);
+  --color-ink-300: var(--ink-300);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+
+  --color-success: var(--success);
+  --color-success-ink: var(--success-ink);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-ink: var(--warning-ink);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-ink: var(--info-ink);
+  --color-info-soft: var(--info-soft);
+
+  --color-q1: var(--q1-accent);
+  --color-q2: var(--q2-accent);
+  --color-q3: var(--q3-accent);
+  --color-q4: var(--q4-accent);
+
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --radius-2xl: var(--r-2xl);
+}
+
+/* 注意：阴影 / 动效 / 字号 / 字体不放进 @theme inline。
+   它们不随主题变化，且 inline 里写成 `--shadow-1: var(--shadow-1)` 会变成自引用。 */
+
+/* -------------------------------------------------------------------------- */
+/*                                   基础样式                                   */
+/* -------------------------------------------------------------------------- */
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    /* 全站描边默认走令牌，避免每个 border-* 都要重复指定颜色 */
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    background-color: var(--bg);
+  }
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--bg);
+    color: var(--ink-700);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 22px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--ink-900);
+    font-weight: 600;
+  }
+
+  /* 焦点环是可达性的底线，任何组件都不许 outline: none */
+  :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* 导航与按钮不参与选中；正文允许复制 */
+  :where(button, [role="button"], [role="tab"], [role="menuitem"], nav a) {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--ink-900);
+  }
+
+  /* 滚动条 8px、圆角、低对比（设计规范 §7.5） */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--border-strong);
+    border-radius: var(--r-full);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  img,
+  svg {
+    display: block;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                             组合类（令牌驱动）                               */
+/* -------------------------------------------------------------------------- */
+
+@layer components {
+  .gradient-accent {
+    background-image: var(--accent-gradient);
+  }
+
+  .gradient-q1 {
+    background-image: linear-gradient(180deg, var(--q1-from) 0%, var(--q1-to) 100%);
+  }
+
+  .gradient-q2 {
+    background-image: linear-gradient(180deg, var(--q2-from) 0%, var(--q2-to) 100%);
+  }
+
+  .gradient-q3 {
+    background-image: linear-gradient(180deg, var(--q3-from) 0%, var(--q3-to) 100%);
+  }
+
+  .gradient-q4 {
+    background-image: linear-gradient(180deg, var(--q4-from) 0%, var(--q4-to) 100%);
+  }
+
+  /* 毛玻璃只允许出现在工具条和弹层背板（设计规范 §3） */
+  .glass {
+    background-color: var(--surface);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 象限格：内亮边用 box-shadow 画，不额外占一层 DOM */
+  .cell-inner-ring {
+    box-shadow: inset 0 0 0 1px var(--cell-inner-ring);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes driven-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 降低动态效果：全部降级为「瞬时切换」，但保留状态变化本身 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
