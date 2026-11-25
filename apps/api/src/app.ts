@@ -17,7 +17,9 @@ import { crudRoutes } from "./routes/crud";
 import { deviceRoutes } from "./routes/devices";
 import { settingsRoutes } from "./routes/settings";
 import { apiKeyRoutes } from "./routes/apikeys";
-import { contextRoutes } from "./services/context";
+import { contextRoutes } from "./routes/context";
+import { mcpRoutes } from "./routes/mcp";
+import { exportRoutes } from "./routes/export";
 
 /** 请求体上限：安全文档要求 1MB（同步批次最多 500 个 op）。 */
 export const MAX_BODY_BYTES = 1024 * 1024;
@@ -137,6 +139,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   protectedApi.route("/", settingsRoutes(resolved));
   protectedApi.route("/", apiKeyRoutes(resolved));
   protectedApi.route("/", contextRoutes(resolved));
+  protectedApi.route("/", mcpRoutes(resolved));
+  protectedApi.route("/", exportRoutes(resolved));
   // 通用 CRUD 放最后：/:collection 会吞掉任何未匹配的单段路径
   protectedApi.route("/", crudRoutes(resolved));
   app.route("/api/v1", protectedApi);
