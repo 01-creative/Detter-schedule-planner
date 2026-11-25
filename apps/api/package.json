@@ -3,10 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "dev": "wrangler dev --port 8787 --local",
-    "dev:node": "node --watch src/server.ts",
-    "start:node": "node src/server.ts",
+    "dev": "wrangler dev --port 8787",
+    "build:node": "node scripts/build-node.mjs",
+    "dev:node": "node scripts/build-node.mjs --watch",
+    "start:node": "node dist/server.js",
     "deploy": "wrangler deploy",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
@@ -22,6 +26,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4",
     "@types/node": "^22.20.7",
+    "esbuild": "^0.28.2",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7",
     "wrangler": "^4.168.0"

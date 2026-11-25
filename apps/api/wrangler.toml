@@ -1,0 +1,14 @@
+name = "detter-api"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+# D1 绑定。database_id 是占位符，部署时才在 CI/本地填真实值——
+# 真实 ID 属于部署环境信息，不允许硬编码进仓库。
+[[d1_databases]]
+binding = "DB"
+database_name = "detter"
+database_id = "TODO_REPLACE"
+
+[vars]
+APP_VERSION = "0.1.0"
+# APP_ORIGIN 等敏感/环境相关配置放 .dev.vars（本地）或 wrangler secret（生产）

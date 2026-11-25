@@ -1,0 +1,26 @@
+services:
+  detter:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: detter:latest
+    container_name: detter
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      # 首次启动必须提供，初始化完成后建议删掉这一行
+      SETUP_TOKEN: "${SETUP_TOKEN:?请先设置 SETUP_TOKEN}"
+      APP_ORIGIN: "https://detter.example.com"
+      DETTER_DB: "/data/detter.sqlite"
+      TZ: "Asia/Shanghai"
+    volumes:
+      - detter-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  detter-data:

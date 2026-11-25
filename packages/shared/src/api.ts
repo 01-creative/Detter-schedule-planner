@@ -135,9 +135,19 @@ export const TaskQuerySchema = z.object({
   okrId: z.string().optional(),
   q: z.string().max(200).optional(),
   includeDeleted: z.coerce.boolean().default(false),
-  limit: z.coerce.number().int().min(1).max(500).default(200),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+  /** keyset 分页游标（服务端返回的 nextCursor） */
+  cursor: z.string().optional(),
 });
 export type TaskQuery = z.infer<typeof TaskQuerySchema>;
+
+/** 列表统一响应：{ items, nextCursor }。所有 collection 的 GET 都返回它。 */
+export function listResponseSchema<T extends z.ZodTypeAny>(item: T) {
+  return z.object({
+    items: z.array(item),
+    nextCursor: z.string().nullable().default(null),
+  });
+}
 
 export const OkrQuerySchema = z.object({
   period: OkrPeriodSchema.optional(),

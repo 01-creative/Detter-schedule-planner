@@ -107,11 +107,12 @@ local.updatedAt < remote.updatedAt  → false
 | 实体不存在 + upsert | 插入，`rev = 1` |
 | 实体存在 + `baseRev === rev` | 更新，`rev += 1` |
 | 实体存在 + `baseRev !== rev` | 返回 conflict，不写入 |
+| 实体已软删 + upsert + `baseRev === rev` | **复活**：`deletedAt = null`，`rev += 1`（另一台设备离线时又编辑了它） |
 | delete + 不存在 | applied（幂等） |
 | delete + rev 匹配 | `deleted_at = now`，`rev += 1`，change 记 `deleted = 1` |
 | `opId` 已存在 | duplicate，返回原始 rev/seq |
 
-服务端强制字段：`rev`（自己算）、`deviceId`（取请求方）。
+服务端**不判断胜负**，只做过期检查：`baseRev !== rev` 就返回 `conflict` + 权威版本（若服务端当前是墓碑，`server` 为 `null`），由客户端用 `localWins` 决定谁覆盖谁。
 `updatedAt` 用 payload 值，但若与服务器时间相差 > 24h，用服务器时间（防设备时钟错误导致永远赢/永远输）。
 
 ---
@@ -127,7 +128,8 @@ local.updatedAt < remote.updatedAt  → false
 ## 7. 时钟
 
 不做 HLC。理由：单人设备时钟由系统 NTP 同步，误差 < 1s；LWW 用毫秒时间戳足够。
-若检测到同一实体在 1s 内被两台设备写入，服务端在 `changes` 上记 `clock_skew` 标记，供排查。
+服务端对 `updatedAt` 做 ±24h 钳制（超出范围就用服务器时间），避免某台设备时钟错乱后永远赢或永远输。
+暂不记录 `clock_skew` 标记（`changes` 表无此列，收益不足以加一次迁移）；排查冲突时看 `changes` 里的 `device_id` 与 `updated_at` 即可。
 
 ---
 
