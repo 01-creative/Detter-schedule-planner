@@ -12,3 +12,8 @@ database_id = "TODO_REPLACE"
 [vars]
 APP_VERSION = "0.1.0"
 # APP_ORIGIN 等敏感/环境相关配置放 .dev.vars（本地）或 wrangler secret（生产）
+
+# 提醒调度（T14）：每分钟跑一次 runReminderTick。
+# Workers 的 cron 最小粒度就是 1 分钟，正好对上「到点提醒」的精度需求。
+[triggers]
+crons = ["* * * * *"]

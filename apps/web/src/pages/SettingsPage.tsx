@@ -21,6 +21,7 @@ import {
 } from "@detter/ui";
 import { db } from "@/db";
 import { AISettingsSection } from "@/features/settings/ai";
+import { ReminderSettingsSection } from "@/features/settings/reminders";
 import { getDeviceId, getDeviceName, getPlatform } from "@/lib/device";
 import { formatSyncTime } from "@/lib/format";
 import { retryFailed, syncNow } from "@/sync/client";
@@ -171,6 +172,8 @@ export default function SettingsPage() {
       </Card>
 
       <AISettingsSection />
+
+      <ReminderSettingsSection />
 
       <Card className="space-y-3">
         <h2 className="text-h2 text-ink-900">外观</h2>

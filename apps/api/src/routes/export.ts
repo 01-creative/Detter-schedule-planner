@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { ENTITY_NAMES, addDays, dayKey, startOfDay } from "@detter/shared";
 import type { ContextRange } from "@detter/shared";
 import type { AppEnv, ResolvedDeps } from "../env";
+import type { Db } from "../db/types";
 import { ApiError } from "../lib/errors";
 import { currentAuth, requireScope } from "../auth/middleware";
 import { snapshotAll } from "../sync/query";
@@ -104,7 +105,7 @@ function foldLine(line: string): string {
   return chunks.join("\r\n ");
 }
 
-function buildIcs(tasks: JsonObject[], now: number): string {
+export function buildIcs(tasks: JsonObject[], now: number): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -179,6 +180,21 @@ function buildIcs(tasks: JsonObject[], now: number): string {
 /*                                  路由                                       */
 /* -------------------------------------------------------------------------- */
 
+/** ICS 的任务来源：只取未删除的任务，按时间排序（供 /export/ics 与日历订阅共用）。 */
+export async function loadIcsTasks(db: Db, userId: string): Promise<JsonObject[]> {
+  const rows = await db.all<{ payload: string }>(
+    "SELECT payload FROM tasks WHERE user_id = ? AND deleted_at IS NULL ORDER BY COALESCE(start_at, due_at, 0) ASC",
+    [userId],
+  );
+  return rows.map((row) => {
+    try {
+      return JSON.parse(row.payload) as JsonObject;
+    } catch {
+      return {} as JsonObject;
+    }
+  });
+}
+
 export function exportRoutes(deps: ResolvedDeps): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
@@ -235,18 +251,7 @@ export function exportRoutes(deps: ResolvedDeps): Hono<AppEnv> {
   router.get("/export/ics", requireScope("read"), async (c) => {
     const auth = currentAuth(c);
     const now = deps.now();
-
-    const rows = await deps.db.all<{ payload: string }>(
-      "SELECT payload FROM tasks WHERE user_id = ? AND deleted_at IS NULL ORDER BY COALESCE(start_at, due_at, 0) ASC",
-      [auth.userId],
-    );
-    const tasks = rows.map((row) => {
-      try {
-        return JSON.parse(row.payload) as JsonObject;
-      } catch {
-        return {} as JsonObject;
-      }
-    });
+    const tasks = await loadIcsTasks(deps.db, auth.userId);
 
     return c.body(buildIcs(tasks, now), 200, {
       "content-type": MIME_ICS,

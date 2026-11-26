@@ -12,6 +12,7 @@ import {
   softDeleteEntity,
   updateEntity,
 } from "../repo/crud";
+import { SECRET_MASK, isSecretSetting } from "../repo/settings";
 
 /**
  * 通用 CRUD 路由：11 个可同步实体共用一套实现。
@@ -89,6 +90,10 @@ export function crudRoutes(deps: ResolvedDeps): Hono<AppEnv> {
       parseBoolean(c.req.query("includeDeleted")),
     );
     if (!payload) throw ApiError.notFound("实体不存在");
+    // 单条读取同样不能回显密钥（GET /settings/:id 的兜底）
+    if (entity === "setting" && typeof payload.key === "string" && isSecretSetting(payload.key)) {
+      payload.value = SECRET_MASK;
+    }
     return ok(c, payload);
   });
 

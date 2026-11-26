@@ -5,7 +5,8 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app";
 import { runMigrations } from "./db/migrate";
 import { createNodeDb } from "./db/node";
-import { readNodeConfig } from "./env";
+import { readNodeConfig, readNodePushDeps } from "./env";
+import { runReminderTick } from "./services/reminders/schedule";
 
 /**
  * Node 入口：node:sqlite + @hono/node-server。
@@ -48,7 +49,17 @@ if (dbFile !== ":memory:") {
 const db = createNodeDb(dbFile);
 const migrationsDir = resolveMigrationsDir();
 const applied = await runMigrations(db, migrationsDir);
-const app = createApp({ db, config, runtime: "node" });
+const push = readNodePushDeps(process.env);
+const app = createApp({
+  db,
+  config,
+  runtime: "node",
+  push: {
+    vapid: push.vapid,
+    fetch: push.fetch,
+    endpointAllowlist: push.endpointAllowlist,
+  },
+});
 
 const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(
@@ -64,6 +75,53 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     console.log(`[detter-api] ${signal} received, shutting down`);
+    clearInterval(reminderTimer);
     server.close(() => process.exit(0));
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/*                          提醒调度（T14 · Node 运行时）                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Workers 用 scheduled 事件，Node 用 setInterval —— 两边都调 runReminderTick，
+ * 保证「同一份调度逻辑、两种部署方式」。60s 一次与 Workers cron 的最小粒度一致。
+ *
+ * 三个细节：
+ * 1. `tickRunning` 防重入：上一次 tick 还在等外部 HTTP 时，不要叠加第二次；
+ * 2. 定时器 unref：不因为它挂着而阻止进程退出；
+ * 3. 启动 1 秒后先跑一次：开发时不用干等一分钟才能看到「到点」。
+ */
+const REMINDER_TICK_MS = 60_000;
+let tickRunning = false;
+
+async function reminderTick(): Promise<void> {
+  if (tickRunning) return;
+  tickRunning = true;
+  try {
+    const summary = await runReminderTick(db, Date.now(), {
+      vapid: push.vapid,
+      fetch: push.fetch,
+      pushEndpointAllowlist: push.endpointAllowlist,
+    });
+    if (summary.sent > 0 || summary.failed > 0 || summary.errors.length > 0) {
+      console.log(
+        `[reminders] tick materialized=${summary.materialized} sent=${summary.sent} ` +
+          `retried=${summary.retried} failed=${summary.failed} downgraded=${summary.downgraded} ` +
+          `errors=${summary.errors.length}`,
+      );
+    }
+  } catch (error) {
+    console.error(
+      `[reminders] tick 失败：${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`,
+    );
+  } finally {
+    tickRunning = false;
+  }
+}
+
+const reminderTimer = setInterval(() => void reminderTick(), REMINDER_TICK_MS);
+reminderTimer.unref();
+const reminderBootTimer = setTimeout(() => void reminderTick(), 1_000);
+reminderBootTimer.unref();

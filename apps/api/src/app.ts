@@ -20,6 +20,9 @@ import { apiKeyRoutes } from "./routes/apikeys";
 import { contextRoutes } from "./routes/context";
 import { mcpRoutes } from "./routes/mcp";
 import { exportRoutes } from "./routes/export";
+import { reminderRoutes } from "./routes/reminders";
+import { pushRoutes } from "./routes/push";
+import { calendarRoutes } from "./routes/calendar";
 
 /** 请求体上限：安全文档要求 1MB（同步批次最多 500 个 op）。 */
 export const MAX_BODY_BYTES = 1024 * 1024;
@@ -89,6 +92,11 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     config: deps.config,
     runtime: deps.runtime,
     now: deps.now ?? (() => Date.now()),
+    push: {
+      vapid: deps.push?.vapid ?? null,
+      fetch: deps.push?.fetch ?? ((input, init) => fetch(input, init)),
+      endpointAllowlist: deps.push?.endpointAllowlist ?? [],
+    },
   };
 
   const app = new Hono<AppEnv>();
@@ -128,6 +136,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   // 公开路由：健康检查 + 未登录也要能拿 200 的鉴权状态/初始化/登录
   app.route("/api/v1", healthRoutes(resolved));
   app.route("/api/v1", authPublicRoutes(resolved));
+  // 日历订阅（T14）：系统日历不带 Cookie，用 URL 里的随机 token 鉴权
+  app.route("/api/v1", calendarRoutes(resolved));
 
   // 受保护路由：先 CSRF 再鉴权，最后按端点声明所需 scope
   const protectedApi = new Hono<AppEnv>();
@@ -141,6 +151,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   protectedApi.route("/", contextRoutes(resolved));
   protectedApi.route("/", mcpRoutes(resolved));
   protectedApi.route("/", exportRoutes(resolved));
+  protectedApi.route("/", reminderRoutes(resolved));
+  protectedApi.route("/", pushRoutes(resolved));
   // 通用 CRUD 放最后：/:collection 会吞掉任何未匹配的单段路径
   protectedApi.route("/", crudRoutes(resolved));
   app.route("/api/v1", protectedApi);

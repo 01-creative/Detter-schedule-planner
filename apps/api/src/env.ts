@@ -1,5 +1,6 @@
 import type { Db } from "./db/types";
 import type { ApiScope } from "@detter/shared";
+import type { VapidCredentials } from "./services/reminders/types";
 
 /**
  * Workers 绑定（与 wrangler.toml 的 [vars] / .dev.vars 对齐）。
@@ -14,6 +15,8 @@ export interface WorkerEnv {
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
+  /** 逗号分隔的额外 push endpoint 域名后缀（自建推送服务时用） */
+  PUSH_ENDPOINT_ALLOWLIST?: string;
 }
 
 export interface AppConfig {
@@ -83,6 +86,53 @@ export function readNodeConfig(env: Record<string, string | undefined>): AppConf
   });
 }
 
+/* -------------------------------------------------------------------------- */
+/*                              提醒/推送运行时依赖                              */
+/* -------------------------------------------------------------------------- */
+
+/** VAPID 环境变量的读取方式：Workers 从绑定读，Node 从 process.env 读。 */
+export interface PushDepsInput {
+  vapid?: VapidCredentials | null;
+  fetch?: typeof fetch;
+  endpointAllowlist?: string[];
+}
+
+export interface ResolvedPushDeps {
+  vapid: VapidCredentials | null;
+  fetch: typeof fetch;
+  endpointAllowlist: string[];
+}
+
+function vapidFrom(publicKey: string | undefined, privateKey: string | undefined, subject: string | undefined): VapidCredentials | null {
+  const pub = (publicKey ?? "").trim();
+  const priv = (privateKey ?? "").trim();
+  if (!pub || !priv) return null;
+  return { publicKey: pub, privateKey: priv, subject: (subject ?? "").trim() };
+}
+
+export function readWorkerPushDeps(env: WorkerEnv): ResolvedPushDeps {
+  return {
+    vapid: vapidFrom(env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT),
+    fetch: (input, init) => fetch(input, init),
+    endpointAllowlist: splitAllowlist(env.PUSH_ENDPOINT_ALLOWLIST),
+  };
+}
+
+export function readNodePushDeps(env: Record<string, string | undefined>): ResolvedPushDeps {
+  return {
+    vapid: vapidFrom(env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT),
+    fetch: (input, init) => fetch(input, init),
+    endpointAllowlist: splitAllowlist(env.PUSH_ENDPOINT_ALLOWLIST),
+  };
+}
+
+function splitAllowlist(raw: string | undefined): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => item.length > 0);
+}
+
 /** 创建应用所需的全部依赖，由各运行时入口注入（app.ts 不读 process.env / 全局变量）。 */
 export interface AppDeps {
   db: Db;
@@ -90,9 +140,11 @@ export interface AppDeps {
   runtime: "workers" | "node";
   /** 可注入时钟：测试里需要控制「过期」「时钟偏差」这类场景。 */
   now?: () => number;
+  /** 提醒调度用：VAPID 密钥、fetch（测试可替换）、push endpoint 白名单 */
+  push?: PushDepsInput;
 }
 
-export type ResolvedDeps = AppDeps & { now: () => number };
+export type ResolvedDeps = AppDeps & { now: () => number; push: ResolvedPushDeps };
 
 /**
  * 请求身份上下文。
