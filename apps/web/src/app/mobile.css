@@ -1,0 +1,23 @@
+/* 移动端全局修正（T13）。
+ *
+ * 只放「跨页面、且属于外壳职责」的规则；具体页面的布局仍写在各页面里。
+ * 放在这里而不是 global.css，是因为 global.css 归设计系统管线所有，
+ * 移动端补丁集中一个文件，回头整体删改都不会牵动别处。
+ */
+
+@media (max-width: 767px), (pointer: coarse) {
+  /* iOS Safari 在 font-size < 16px 的输入框上聚焦会自动把整页放大，
+     放大后布局错位、还得手动缩回去 —— 这是「掏出来 3 秒记完」最烦的打断。
+     用 max() 而不是硬写 16px：本来就更大的输入框保持原字号。
+     覆盖范围包含 features/** 里的输入框，所以放在全局而不是逐个组件里改。 */
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
+html {
+  /* 横屏时 iOS 会自作主张放大字号，锁回 100% */
+  -webkit-text-size-adjust: 100%;
+}

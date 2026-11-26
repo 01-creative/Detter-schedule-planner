@@ -26,6 +26,7 @@
     "@playwright/test": "^1.65.1",
     "@types/node": "^22.20.7",
     "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.10.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8",

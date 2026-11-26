@@ -26,6 +26,7 @@ import { formatSyncTime } from "@/lib/format";
 import { retryFailed, syncNow } from "@/sync/client";
 import { useSyncStatus } from "@/sync/useSyncStatus";
 import { useUIStore, type ThemeMode } from "@/stores/ui";
+import { InstallCard } from "@/components/shell/InstallCard";
 
 /**
  * 设置页。
@@ -181,7 +182,7 @@ export default function SettingsPage() {
               aria-pressed={theme === option.value}
               onClick={() => setTheme(option.value)}
               className={cn(
-                "flex h-10 items-center gap-2 rounded-md border px-3 text-caption transition-colors duration-[var(--dur-1)]",
+                "flex h-11 items-center gap-2 rounded-md border px-3 text-caption transition-colors duration-[var(--dur-1)]",
                 theme === option.value
                   ? "border-accent/30 bg-accent-soft text-accent"
                   : "border-border bg-surface-solid text-ink-500 hover:border-border-strong hover:text-ink-900",
@@ -222,6 +223,8 @@ export default function SettingsPage() {
           设备 ID 参与冲突判定：两边同时改一条时，更新时间较晚的一方胜，时间相同则 ID 大的胜。
         </p>
       </Card>
+
+      <InstallCard />
 
       <Card className="space-y-3">
         <div className="flex items-center gap-2">

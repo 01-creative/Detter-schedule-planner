@@ -1,7 +1,36 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
+import type { Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+
+/**
+ * 生成 SW 的预缓存清单（T13）。
+ *
+ * 为什么需要它：路由是 lazy 的，`/inbox` 这类页面的 chunk 只有在第一次访问后才会进缓存。
+ * 不预缓存的话，装好应用、断网、再从深链打开一个没去过的页面，会撞上
+ * 「Failed to fetch dynamically imported module」——离线可用就成了半句话。
+ *
+ * 做法：构建结束时把所有产物文件名写进 /precache-manifest.json，public/sw.js 在 install
+ * 阶段读取它并一次性缓存。不引入任何依赖，也不用把哈希文件名硬编码进 SW。
+ */
+function precacheManifest(): Plugin {
+  return {
+    name: "detter-precache-manifest",
+    apply: "build",
+    generateBundle(_options, bundle) {
+      const files = Object.keys(bundle)
+        .filter((file) => /\.(?:js|css|svg|png|woff2?)$/.test(file))
+        .map((file) => `/${file}`)
+        .sort();
+      this.emitFile({
+        type: "asset",
+        fileName: "precache-manifest.json",
+        source: JSON.stringify({ files }, null, 2),
+      });
+    },
+  };
+}
 
 /**
  * 开发服务器把 /api 代理到本地后端（8787），这样浏览器里只有 5173 一个源，
@@ -9,7 +38,7 @@ import tailwindcss from "@tailwindcss/vite";
  * 后端没起的时候只是代理 502，前端按「离线」降级，不会崩。
  */
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), precacheManifest()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

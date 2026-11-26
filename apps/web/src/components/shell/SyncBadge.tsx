@@ -56,8 +56,9 @@ export function SyncBadge({ compact = false }: { compact?: boolean }) {
           type="button"
           aria-label={`同步状态：${label}`}
           className={cn(
-            "inline-flex h-9 items-center gap-2 rounded-md border border-border bg-surface-solid px-2.5 text-caption transition-colors duration-[var(--dur-1)] hover:border-border-strong",
-            compact && "w-9 justify-center px-0",
+            "inline-flex items-center gap-2 rounded-md border border-border bg-surface-solid text-caption transition-colors duration-[var(--dur-1)] hover:border-border-strong",
+            // 移动端（compact）也要 44×44：顶栏 52px 放得下，手指不必瞄准
+            compact ? "size-11 justify-center px-0" : "h-9 px-2.5",
           )}
         >
           <span className="relative flex size-4 items-center justify-center">

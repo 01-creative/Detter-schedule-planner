@@ -4,26 +4,32 @@ import { ToastProvider } from "@detter/ui";
 import { CapturePanel } from "@/features/capture/CapturePanel";
 import { start as startSync, stop as stopSync } from "@/sync/client";
 import { AuthProvider, useAuth } from "./auth";
+import { PwaProvider } from "./pwa";
 import { ThemeProvider } from "./theme";
+import "./mobile.css";
 
 /**
  * 全局 Provider 装配。
  *
- * 顺序有讲究：主题 → 提示 → 鉴权 → 捕获面板。
+ * 顺序有讲究：安装能力 → 主题 → 提示 → 鉴权 → 捕获面板。
+ * PwaProvider 放在最外层：设置页的「安装到主屏」要读浏览器抛的 beforeinstallprompt，
+ * 而那个事件在页面加载几秒内就会到，越早监听越不容易错过。
  * 捕获面板必须在 ToastProvider 内（写入成功要 toast），
  * 也必须在鉴权之后（离线也要能写收件箱，所以它不依赖登录态，只借用离线的宽松放行）。
  */
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <SyncBootstrap />
-          {children}
-          <CapturePanel />
-        </AuthProvider>
-      </ToastProvider>
-    </ThemeProvider>
+    <PwaProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <SyncBootstrap />
+            {children}
+            <CapturePanel />
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    </PwaProvider>
   );
 }
 

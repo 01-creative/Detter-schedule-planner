@@ -47,7 +47,9 @@ export function MobileHeader() {
   const title = viewTitle(location.pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-[52px] items-center gap-3 border-b border-border glass px-4 md:hidden">
+    // 装到主屏后（standalone + viewport-fit=cover）内容会顶到状态栏下面，
+    // 这里把安全区加进高度里，iPad / iPhone 的刘海与状态栏都不会压住标题。
+    <header className="sticky top-0 z-30 flex h-[calc(52px+env(safe-area-inset-top))] items-center gap-3 border-b border-border glass px-4 pt-[env(safe-area-inset-top)] md:hidden">
       <div className="flex min-w-0 items-center gap-2">
         {item && <item.icon className="size-4 shrink-0 text-accent" aria-hidden="true" />}
         <h1 className="truncate text-h2 text-ink-900">{title}</h1>
@@ -156,7 +158,8 @@ function AvatarMenu() {
         <button
           type="button"
           aria-label={`账户菜单（${deviceName}）`}
-          className="rounded-full transition-transform duration-[var(--dur-1)] hover:scale-[1.03] active:scale-[.96]"
+          // 44×44 命中区（头像本身 36）：设计规范 §7 要求移动端可点元素 ≥ 44
+          className="flex size-11 items-center justify-center rounded-full transition-transform duration-[var(--dur-1)] hover:scale-[1.03] active:scale-[.96]"
         >
           <Avatar name={deviceName} size="md" />
         </button>
