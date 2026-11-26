@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  BookOpen,
   CalendarDays,
   ChartLine,
   Inbox,
@@ -44,6 +45,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "日历",
     icon: CalendarDays,
     description: "任务与日程同轴，按天/周/月看",
+  },
+  {
+    to: "/courses",
+    label: "课程",
+    icon: BookOpen,
+    description: "课表导入、考核占分与每周作业",
   },
   {
     to: "/okr",
@@ -99,6 +106,8 @@ const TITLES: Record<string, string> = Object.fromEntries(
 export function viewTitle(pathname: string): string {
   if (TITLES[pathname]) return TITLES[pathname];
   if (pathname.startsWith("/mindmap")) return "导图";
+  // 课程详情是 /courses/:id，菜单标题统一显示「课程」
+  if (pathname.startsWith("/courses")) return "课程";
   if (pathname === "/login") return "登录";
   if (pathname === "/setup") return "初始化";
   return "Detter";

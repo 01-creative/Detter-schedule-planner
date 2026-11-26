@@ -1,12 +1,17 @@
 import {
+  ASSESSMENT_KINDS,
+  ASSESSMENT_STATUSES,
+  ASSIGNMENT_STATUSES,
   GOAL_KINDS,
   GOAL_STATUSES,
   INBOX_STATUSES,
   OKR_PERIODS,
   TASK_KINDS,
   TASK_STATUSES,
+  courseWeekNo,
   dayKey,
   endOfWeek,
+  parseLooseDate,
   startOfWeek,
 } from "@detter/shared";
 import type { ApiScope, McpToolName } from "@detter/shared";
@@ -16,6 +21,18 @@ import { ApiError } from "../lib/errors";
 import { uuidv7 } from "../lib/ids";
 import { hasScope } from "../auth/middleware";
 import { createEntity, listPayloads, readPayload, softDeleteEntity, updateEntity } from "../repo/crud";
+import {
+  coursePlan,
+  courseSummaries,
+  createAssessment,
+  createAssignment,
+  ensureCourse,
+  findCourseByName,
+  listCourses,
+  normalizeAssessmentArgs,
+  resolveSemesterStart,
+  setSemesterStart,
+} from "./courses";
 import {
   buildContextPack,
   captureToInbox,
@@ -127,6 +144,21 @@ function optionalNumberArg(args: JsonObject, key: string): number | null | undef
     throw invalidParams(`参数 ${key} 必须是数字（毫秒时间戳）`);
   }
   return Math.trunc(value);
+}
+
+/**
+ * 允许小数的数字参数（学分、权重这类）。
+ *
+ * 不能复用 optionalNumberArg：它会对时间戳做 Math.trunc，把 3.5 学分变成 3 学分。
+ */
+function optionalFloatArg(args: JsonObject, key: string): number | null | undefined {
+  if (!hasArg(args, key)) return undefined;
+  const value = args[key];
+  if (value === null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw invalidParams(`参数 ${key} 必须是数字`);
+  }
+  return value;
 }
 
 function requireNumberArg(args: JsonObject, key: string): number {
@@ -747,6 +779,241 @@ async function handleSearch(ctx: McpCallContext, args: JsonObject): Promise<Tool
 }
 
 /* -------------------------------------------------------------------------- */
+/*                              工具实现：课程                                  */
+/* -------------------------------------------------------------------------- */
+
+function courseServiceContext(ctx: McpCallContext) {
+  return { db: ctx.db, userId: ctx.userId, now: ctx.now };
+}
+
+function toDayKeyOrThrow(raw: string, field: string): string {
+  const parsed = parseLooseDate(raw);
+  if (parsed === null) throw invalidParams(`参数 ${field} 必须是 YYYY-MM-DD 或可解析的日期`);
+  return dayKey(parsed);
+}
+
+/** 读课程引用参数：`courseId` 优先，其次 `course` / `courseName`。 */
+function courseRefArgs(args: JsonObject): { courseId?: string; courseName?: string } {
+  const courseId = optionalStringArg(args, "courseId", 200) ?? undefined;
+  const courseName =
+    optionalStringArg(args, "course", 200) ?? optionalStringArg(args, "courseName", 200) ?? undefined;
+  if (!courseId && !courseName) throw invalidParams("需要提供 courseId 或课程名（course）");
+  return { courseId, courseName };
+}
+
+/** 更新类工具只认已存在的课程：找不到就报 not_found，不静默新建。 */
+async function resolveExistingCourse(ctx: McpCallContext, args: JsonObject): Promise<{ id: string; name: string }> {
+  const courseId = optionalStringArg(args, "courseId", 200) ?? optionalStringArg(args, "id", 200) ?? undefined;
+  const courseName =
+    optionalStringArg(args, "course", 200) ?? optionalStringArg(args, "courseName", 200) ?? undefined;
+  if (!courseId && !courseName) throw invalidParams("需要提供 courseId 或课程名（course）");
+  if (courseId) {
+    const payload = await readPayload(ctx.db, "course", ctx.userId, courseId);
+    if (!payload) throw ApiError.notFound("课程不存在");
+    return { id: String(payload.id), name: typeof payload.name === "string" ? payload.name : "" };
+  }
+  const courses = await listCourses(courseServiceContext(ctx), { includeArchived: true });
+  const found = findCourseByName(courses, courseName ?? "");
+  if (!found) throw ApiError.notFound(`没有找到课程「${courseName}」`);
+  return { id: found.id, name: found.name };
+}
+
+async function handleListCourses(ctx: McpCallContext, args: JsonObject): Promise<ToolOutcome> {
+  const includeArchived = optionalBooleanArg(args, "includeArchived") ?? false;
+  const summaries = await courseSummaries(courseServiceContext(ctx), { includeArchived });
+  const weekNo = summaries.find((item) => item.weekNo !== null)?.weekNo ?? null;
+  return {
+    data: {
+      items: summaries,
+      count: summaries.length,
+      /** 所有课程共用同一个学期起点时，这里就是本周周次 */
+      weekNo,
+      missingHomework: summaries.filter((item) => item.homeworkMissing).length,
+    },
+  };
+}
+
+async function handleCreateCourse(ctx: McpCallContext, args: JsonObject): Promise<ToolOutcome> {
+  const name = requireStringArg(args, "name", 200);
+  const input: JsonObject = { name, deviceId: "" };
+
+  const code = optionalStringArg(args, "code", 40);
+  if (code !== undefined) input.code = code;
+  const teacher = optionalStringArg(args, "teacher", 200);
+  if (teacher !== undefined) input.teacher = teacher;
+  const note = optionalStringArg(args, "note", 4000);
+  if (note !== undefined) input.note = note;
+  const color = optionalStringArg(args, "color", 40);
+  if (color !== undefined) input.color = color;
+  const goalId = optionalStringArg(args, "goalId", 200);
+  if (goalId !== undefined) input.goalId = goalId;
+
+  const credits = optionalFloatArg(args, "credits");
+  if (credits !== undefined) input.credits = credits;
+  const weeklyHomework = optionalBooleanArg(args, "weeklyHomework");
+  if (weeklyHomework !== undefined) input.weeklyHomework = weeklyHomework;
+  const semesterStart = optionalStringArg(args, "semesterStart", 40);
+  if (semesterStart !== undefined && semesterStart !== null) {
+    input.semesterStart = toDayKeyOrThrow(semesterStart, "semesterStart");
+  }
+
+  const course = await createEntity(ctx.db, "course", ctx.userId, { input, deviceId: "", now: ctx.now });
+  return {
+    data: course,
+    audit: { entity: "course", entityId: asRecordId(course), extra: { name } },
+  };
+}
+
+async function handleUpdateCourse(ctx: McpCallContext, args: JsonObject): Promise<ToolOutcome> {
+  const target = await resolveExistingCourse(ctx, args);
+  const patch: JsonObject = {};
+
+  const name = optionalStringArg(args, "name", 200);
+  if (name !== undefined && name !== null) patch.name = name;
+  const code = optionalStringArg(args, "code", 40);
+  if (code !== undefined) patch.code = code;
+  const teacher = optionalStringArg(args, "teacher", 200);
+  if (teacher !== undefined) patch.teacher = teacher;
+  const note = optionalStringArg(args, "note", 4000);
+  if (note !== undefined) patch.note = note;
+  const color = optionalStringArg(args, "color", 40);
+  if (color !== undefined) patch.color = color;
+  const goalId = optionalStringArg(args, "goalId", 200);
+  if (goalId !== undefined) patch.goalId = goalId;
+
+  const credits = optionalFloatArg(args, "credits");
+  if (credits !== undefined) patch.credits = credits;
+  const weeklyHomework = optionalBooleanArg(args, "weeklyHomework");
+  if (weeklyHomework !== undefined) patch.weeklyHomework = weeklyHomework;
+  const archived = optionalBooleanArg(args, "archived");
+  if (archived !== undefined) patch.archived = archived;
+  const semesterStart = optionalStringArg(args, "semesterStart", 40);
+  if (semesterStart !== undefined) {
+    patch.semesterStart = semesterStart === null ? null : toDayKeyOrThrow(semesterStart, "semesterStart");
+  }
+
+  if (Object.keys(patch).length === 0) {
+    throw invalidParams("update_course 至少要提供一个要修改的字段");
+  }
+
+  const course = await updateEntity(ctx.db, "course", ctx.userId, target.id, patch, ctx.now);
+  if (!course) throw ApiError.notFound("课程不存在");
+  return { data: course, audit: { entity: "course", entityId: target.id } };
+}
+
+async function handleAddAssessment(ctx: McpCallContext, args: JsonObject): Promise<ToolOutcome> {
+  const title = requireStringArg(args, "title", 200);
+  const { courseId, courseName } = courseRefArgs(args);
+  const { weight, dueAt } = normalizeAssessmentArgs({ weight: args.weight, date: args.date });
+
+  const ensured = await ensureCourse(courseServiceContext(ctx), {
+    courseId,
+    courseName,
+    weeklyHomework: false,
+  });
+
+  const kind = optionalEnumArg(args, "kind", ASSESSMENT_KINDS);
+  const status = optionalEnumArg(args, "status", ASSESSMENT_STATUSES);
+  const note = optionalStringArg(args, "note", 4000) ?? "";
+
+  const { assessment, task } = await createAssessment(
+    courseServiceContext(ctx),
+    ensured.course,
+    { title, weight, dueAt: dueAt ?? null, kind, status, note },
+    { source: "ai" },
+  );
+
+  return {
+    data: {
+      course: { id: ensured.course.id, name: ensured.course.name, created: ensured.created },
+      assessment,
+      task: { id: task.id, title: task.title, dueAt: task.dueAt, startAt: task.startAt },
+      /** 课程当前的权重合计，AI 可以据此提醒用户「已经 110% 了」 */
+      weight: (await coursePlan(courseServiceContext(ctx), ensured.course.id)).weight,
+    },
+    audit: {
+      entity: "assessment",
+      entityId: assessment.id,
+      extra: { courseId: ensured.course.id, title, weight: assessment.weight },
+    },
+  };
+}
+
+async function handleAddAssignment(ctx: McpCallContext, args: JsonObject): Promise<ToolOutcome> {
+  const title = requireStringArg(args, "title", 200);
+  const { courseId, courseName } = courseRefArgs(args);
+
+  // 通过「加作业」自动建出来的课程，本身就是有每周作业的课
+  const ensured = await ensureCourse(courseServiceContext(ctx), {
+    courseId,
+    courseName,
+    weeklyHomework: true,
+  });
+
+  const dateRaw = args.date;
+  const dueAt =
+    dateRaw === undefined || dateRaw === null
+      ? null
+      : (() => {
+          const parsed = parseLooseDate(dateRaw, { endOfDay: true });
+          if (parsed === null) throw invalidParams(`参数 date 无法解析：${String(dateRaw)}`);
+          return parsed;
+        })();
+
+  const semesterStart = await resolveSemesterStart(courseServiceContext(ctx), ensured.course);
+  let weekNo = optionalIntArg(args, "weekNo", 1, 60);
+  if (weekNo === undefined && dueAt !== null) {
+    const derived = courseWeekNo(semesterStart, dueAt);
+    if (derived !== null) weekNo = derived;
+  }
+  if (weekNo === undefined) {
+    const current = courseWeekNo(semesterStart, ctx.now);
+    if (current === null) throw invalidParams("无法判断第几周：请提供 weekNo，或先用 set_semester_start 设置学期起点");
+    weekNo = current;
+  }
+
+  const status = optionalEnumArg(args, "status", ASSIGNMENT_STATUSES);
+  const note = optionalStringArg(args, "note", 4000) ?? "";
+
+  const { assignment, task } = await createAssignment(
+    courseServiceContext(ctx),
+    ensured.course,
+    { title, weekNo, dueAt, status, note },
+    { source: "ai" },
+  );
+
+  return {
+    data: {
+      course: { id: ensured.course.id, name: ensured.course.name, created: ensured.created },
+      assignment,
+      task: { id: task.id, title: task.title, dueAt: task.dueAt },
+    },
+    audit: {
+      entity: "assignment",
+      entityId: assignment.id,
+      extra: { courseId: ensured.course.id, title, weekNo },
+    },
+  };
+}
+
+async function handleGetCoursePlan(ctx: McpCallContext, args: JsonObject): Promise<ToolOutcome> {
+  const target = await resolveExistingCourse(ctx, args);
+  const plan = await coursePlan(courseServiceContext(ctx), target.id);
+  return { data: plan };
+}
+
+async function handleSetSemesterStart(ctx: McpCallContext, args: JsonObject): Promise<ToolOutcome> {
+  const raw = requireStringArg(args, "date", 40);
+  const hasCourse = hasArg(args, "courseId") || hasArg(args, "course") || hasArg(args, "courseName");
+  const course = hasCourse ? await resolveExistingCourse(ctx, args) : null;
+  const result = await setSemesterStart(courseServiceContext(ctx), raw, course ?? undefined);
+  return {
+    data: { ...result, course: course ? { id: course.id, name: course.name } : null },
+    audit: { entity: "course", entityId: course?.id ?? null, extra: { date: result.semesterStart } },
+  };
+}
+
+/* -------------------------------------------------------------------------- */
 /*                              工具清单 / 调用                                 */
 /* -------------------------------------------------------------------------- */
 
@@ -1029,6 +1296,129 @@ export const MCP_TOOL_DEFS: McpToolDef[] = [
       ["q"],
     ),
     run: handleSearch,
+  },
+  {
+    name: "list_courses",
+    description:
+      "查询课程列表。每门课返回：教师/学分/已记录考核项数与权重合计（weight.total · 0..100+）、本周周次、本周是否已记作业（homeworkMissing）。归档课程默认不返回。",
+    write: false,
+    inputSchema: schema({
+      includeArchived: bool("是否包含已归档课程，默认 false"),
+    }),
+    run: handleListCourses,
+  },
+  {
+    name: "create_course",
+    description:
+      "创建一门课程。semesterStart 传学期第 1 周周一的日期（如 2026-09-07），之后按它推算每周作业属于第几周。",
+    write: true,
+    inputSchema: schema(
+      {
+        name: str("课程名，必填"),
+        code: str("课程号（教务系统里的课程编号）"),
+        teacher: str("教师"),
+        credits: num("学分，可小数"),
+        color: str("课程颜色，如 #6366F1"),
+        semesterStart: str("学期第 1 周周一的日期 YYYY-MM-DD"),
+        weeklyHomework: bool("这门课是否每周都有作业（用于「这周还没记作业」的提醒）"),
+        note: str("备注"),
+        goalId: str("关联的目标 ID（自动生成的 Task 会继承它）"),
+      },
+      ["name"],
+    ),
+    run: handleCreateCourse,
+  },
+  {
+    name: "update_course",
+    description: "修改课程。用 courseId 或 course（课程名）指定，只传要改的字段；archived=true 可归档。",
+    write: true,
+    inputSchema: schema({
+      courseId: str("课程 ID（与 course 二选一）"),
+      course: str("课程名（与 courseId 二选一）"),
+      name: str("新课程名"),
+      code: str("课程号"),
+      teacher: str("教师"),
+      credits: num("学分"),
+      color: str("颜色"),
+      semesterStart: str("学期第 1 周周一 YYYY-MM-DD，null 表示清除"),
+      weeklyHomework: bool("是否每周都有作业"),
+      archived: bool("是否归档"),
+      note: str("备注（整体替换）"),
+      goalId: str("关联目标 ID，null 表示取消关联"),
+    }),
+    run: handleUpdateCourse,
+  },
+  {
+    name: "add_assessment",
+    description:
+      "给课程添加一个考核项并自动生成一条带截止时间的 Task（标题形如「[英语] 大作业」），因此会出现在日历、四象限与提醒里。课程不存在时按课程名自动创建。" +
+      "weight 可以传 30 或 \"30%\"；date 可以传 2026-12-01 或 ISO 时间戳（只写日期时按当天 23:59 处理）。",
+    write: true,
+    inputSchema: schema(
+      {
+        courseId: str("课程 ID（与 course 二选一）"),
+        course: str("课程名（与 courseId 二选一；不存在会自动创建）"),
+        title: str("考核项名称，如「大作业」「期中考试」"),
+        kind: oneOf(ASSESSMENT_KINDS, "类型：homework=作业，project=大作业，exam=考试，quiz=小测，attendance=考勤，other=其他"),
+        weight: { type: ["number", "string"], description: "占总评百分比，接受 30 / \"30%\" / \"30分\"" },
+        date: {
+          type: ["string", "number"],
+          description: "截止日期：2026-12-01 或 ISO 时间戳；只写日期时按当天 23:59 处理",
+        },
+        status: oneOf(ASSESSMENT_STATUSES, "状态，默认 planned"),
+        note: str("备注（老师的原话、PPT 页码等）"),
+      },
+      ["title"],
+    ),
+    run: handleAddAssessment,
+  },
+  {
+    name: "add_assignment",
+    description:
+      "记录一次每周作业并自动建 Task。周次优先用 weekNo；只给 date 时按学期起点推算第几周；都不给时用当前周。" +
+      "课程不存在时自动创建，并标记为「每周都有作业」。",
+    write: true,
+    inputSchema: schema(
+      {
+        courseId: str("课程 ID（与 course 二选一）"),
+        course: str("课程名（与 courseId 二选一）"),
+        title: str("作业标题，如「第 3 章习题」"),
+        weekNo: int("学期第几周（1..60）", 1, 60),
+        date: {
+          type: ["string", "number"],
+          description: "截止日期：2026-12-01 或 ISO 时间戳；只写日期时按当天 23:59 处理",
+        },
+        status: oneOf(ASSIGNMENT_STATUSES, "状态，默认 todo"),
+        note: str("备注"),
+      },
+      ["title"],
+    ),
+    run: handleAddAssignment,
+  },
+  {
+    name: "get_course_plan",
+    description:
+      "查看一门课的完整考核计划：所有考核项、权重合计与剩余未记录、按类型的权重构成、每周作业历史、缺记的周。",
+    write: false,
+    inputSchema: schema({
+      courseId: str("课程 ID（与 course 二选一）"),
+      course: str("课程名（与 courseId 二选一）"),
+    }),
+    run: handleGetCoursePlan,
+  },
+  {
+    name: "set_semester_start",
+    description: "设置学期起点（第 1 周周一）。不传课程则写全局设置，传了课程只改那门课。",
+    write: true,
+    inputSchema: schema(
+      {
+        date: str("学期第 1 周周一的日期，YYYY-MM-DD"),
+        courseId: str("只给这门课设置（可选）"),
+        course: str("只给这门课设置（课程名，可选）"),
+      },
+      ["date"],
+    ),
+    run: handleSetSemesterStart,
   },
 ];
 

@@ -69,6 +69,9 @@ collection 映射：
 | pomodoro | `/pomodoro-sessions` |
 | mindMap | `/mind-maps` |
 | mindNode | `/mind-nodes` |
+| course | `/courses` |
+| assessment | `/assessments` |
+| assignment | `/assignments` |
 | setting | `/settings` |
 
 每个 collection 都支持：
@@ -91,6 +94,22 @@ DELETE /{collection}/:id             软删除
 | `/kpi-entries` | `kpiId`、`from` `to`（YYYY-MM-DD） |
 | `/okrs` | `period`、`periodStart`、`status` |
 | `/pomodoro-sessions` | `taskId`、`from` `to` |
+| `/courses` | `archived`（true=只看归档 / false=只看在用）、`includeArchived`（全部）、`goalId`、`q`（课程名） |
+| `/assessments` | `courseId`、`kind`、`status`、`from` `to`（dueAt 毫秒） |
+| `/assignments` | `courseId`、`weekNo`、`status`、`from` `to`（dueAt 毫秒） |
+
+### 3.1 课程的补充端点
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/courses/summary` | 课程 + 权重合计 + 本周周次 + 本周是否缺作业 |
+| GET | `/courses/:id/plan` | 课程 + 考核项 + 作业快照（脚本/AI 调试用） |
+| GET | `/courses/homework-digest` | 预览「这周有几门课没记作业」，不写通知 |
+| POST | `/courses/homework-digest/check` | 立即跑一次遗漏提醒；`{force:true}` 忽略「到点才发/本周已发」 |
+
+> 这三个路径必须排在通用 CRUD 之前注册，否则 `/courses/summary` 会被 `/:collection/:id` 当成课程 ID。
+> 考核项 / 作业的 Task 是由应用层（MCP 工具或前端写操作）创建的：直接 `POST /assessments` 只落计划，
+> 需要日程时用 MCP 的 `add_assessment`，或在页面里点「一键生成日程」。
 
 ---
 

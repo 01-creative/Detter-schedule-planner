@@ -15,7 +15,7 @@ import {
 import { SECRET_MASK, isSecretSetting } from "../repo/settings";
 
 /**
- * 通用 CRUD 路由：11 个可同步实体共用一套实现。
+ * 通用 CRUD 路由：14 个可同步实体共用一套实现。
  *
  * collection 名与共享包里的 entity 名故意不同（复数/短横线）：
  * URL 面向人和 curl，实体名面向协议与代码。
@@ -31,6 +31,9 @@ export const COLLECTION_TO_ENTITY: Record<string, EntityName> = {
   "pomodoro-sessions": "pomodoro",
   "mind-maps": "mindMap",
   "mind-nodes": "mindNode",
+  courses: "course",
+  assessments: "assessment",
+  assignments: "assignment",
   settings: "setting",
 };
 

@@ -260,6 +260,13 @@ export const MCP_TOOLS = [
   "get_agenda",
   "get_context_pack",
   "search",
+  "list_courses",
+  "create_course",
+  "update_course",
+  "add_assessment",
+  "add_assignment",
+  "get_course_plan",
+  "set_semester_start",
 ] as const;
 export type McpToolName = (typeof MCP_TOOLS)[number];
 

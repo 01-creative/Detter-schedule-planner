@@ -45,6 +45,9 @@ const LOCAL_TABLE: Record<EntityName, string> = {
   pomodoro: "pomodoroSessions",
   mindMap: "mindMaps",
   mindNode: "mindNodes",
+  course: "courses",
+  assessment: "assessments",
+  assignment: "assignments",
   setting: "settings",
 };
 

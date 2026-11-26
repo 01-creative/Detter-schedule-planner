@@ -23,6 +23,7 @@ import { exportRoutes } from "./routes/export";
 import { reminderRoutes } from "./routes/reminders";
 import { pushRoutes } from "./routes/push";
 import { calendarRoutes } from "./routes/calendar";
+import { courseRoutes } from "./routes/courses";
 
 /** 请求体上限：安全文档要求 1MB（同步批次最多 500 个 op）。 */
 export const MAX_BODY_BYTES = 1024 * 1024;
@@ -159,6 +160,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   protectedApi.route("/", exportRoutes(resolved));
   protectedApi.route("/", reminderRoutes(resolved));
   protectedApi.route("/", pushRoutes(resolved));
+  // 课程的补充端点要排在通用 CRUD 之前：/courses/summary 否则会被 /:collection/:id 当成课程 ID
+  protectedApi.route("/", courseRoutes(resolved));
   // 通用 CRUD 放最后：/:collection 会吞掉任何未匹配的单段路径
   protectedApi.route("/", crudRoutes(resolved));
   app.route("/api/v1", protectedApi);

@@ -22,6 +22,7 @@ import {
 import { db } from "@/db";
 import { AISettingsSection } from "@/features/settings/ai";
 import { ReminderSettingsSection } from "@/features/settings/reminders";
+import { CourseSettingsSection } from "@/features/courses/CourseSettingsSection";
 import { getDeviceId, getDeviceName, getPlatform } from "@/lib/device";
 import { formatSyncTime } from "@/lib/format";
 import { retryFailed, syncNow } from "@/sync/client";
@@ -183,6 +184,9 @@ export default function SettingsPage() {
 
       <SectionLabel className="pt-2">提醒与通知</SectionLabel>
       <ReminderSettingsSection />
+
+      <SectionLabel className="pt-2">课程与课表</SectionLabel>
+      <CourseSettingsSection />
 
       <SectionLabel className="pt-2">外观与设备</SectionLabel>
       <Card className="space-y-3">

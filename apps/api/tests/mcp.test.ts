@@ -142,7 +142,7 @@ describe("MCP server", () => {
     const response = await rpc(server, key.plaintext, { jsonrpc: "2.0", id: 2, method: "tools/list" });
     expect(response.status).toBe(200);
     const tools = (response.json.result as ToolListResult).tools;
-    expect(tools).toHaveLength(19);
+    expect(tools).toHaveLength(26);
     expect(tools.map((tool) => tool.name)).toEqual([...MCP_TOOLS]);
 
     for (const tool of tools) {

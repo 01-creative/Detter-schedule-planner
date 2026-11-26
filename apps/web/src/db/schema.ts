@@ -1,6 +1,9 @@
 import Dexie from "dexie";
 import type { Table } from "dexie";
 import type {
+  Assessment,
+  Assignment,
+  Course,
   EntityName,
   Goal,
   InboxItem,
@@ -65,6 +68,9 @@ export class DetterDB extends Dexie {
   declare pomodoroSessions: Table<PomodoroSession, string>;
   declare mindMaps: Table<MindMap, string>;
   declare mindNodes: Table<MindNode, string>;
+  declare courses: Table<Course, string>;
+  declare assessments: Table<Assessment, string>;
+  declare assignments: Table<Assignment, string>;
   declare settings: Table<Setting, string>;
   declare outbox: Table<OutboxRecord, number>;
   declare outboxDead: Table<DeadLetterRecord, number>;
@@ -83,6 +89,31 @@ export class DetterDB extends Dexie {
       pomodoroSessions: "id, taskId, startedAt, updatedAt",
       mindMaps: "id, goalId, updatedAt",
       mindNodes: "id, mapId, parentId, updatedAt",
+      settings: "id, key, updatedAt",
+      outbox: "++seq, opId, entity, entityId, at",
+      outboxDead: "++seq, opId, entity, entityId, at",
+      meta: "key",
+    });
+    /**
+     * v2：课程能力（Course / Assessment / Assignment）。
+     *
+     * Dexie 的版本声明是「全量快照」而不是补丁：每个新版本都要把已有表再写一遍，
+     * 否则 upgrade 之后旧表会被当成不存在。这里只加表、不改旧表结构，属于纯增量升级。
+     */
+    this.version(2).stores({
+      tasks: "id, status, quadrant, goalId, startAt, dueAt, updatedAt, deletedAt",
+      goals: "id, status, kind, sortIndex, updatedAt",
+      inbox: "id, status, capturedAt, updatedAt",
+      okrs: "id, period, periodStart, status, updatedAt",
+      keyResults: "id, okrId, updatedAt",
+      kpis: "id, sortIndex, updatedAt",
+      kpiEntries: "id, kpiId, date, updatedAt",
+      pomodoroSessions: "id, taskId, startedAt, updatedAt",
+      mindMaps: "id, goalId, updatedAt",
+      mindNodes: "id, mapId, parentId, updatedAt",
+      courses: "id, name, archived, updatedAt",
+      assessments: "id, courseId, status, kind, updatedAt",
+      assignments: "id, courseId, weekNo, status, updatedAt",
       settings: "id, key, updatedAt",
       outbox: "++seq, opId, entity, entityId, at",
       outboxDead: "++seq, opId, entity, entityId, at",

@@ -45,9 +45,24 @@ MindMap
 
 InboxItem
   └─► Task.id（分诊后回填 taskId）
+
+Course（课程）
+  ├─◄ Assessment.courseId   1:N（考核构成，带权重）
+  ├─◄ Assignment.courseId   1:N（每周作业，按 weekNo）
+  ├─► Goal.id（可选，goalId：自动生成的 Task 继承它）
+  ├─► Task.id（每个上课时段一条带 rrule 的 event Task，靠 tags 里的 `course:<id>` 关联）
+  └─ Assessment.taskId / Assignment.taskId → Task.id（提醒 / 日历 / 四象限只认 Task）
+
+Setting
+  └─ courses.semesterStart / courses.periodTimes / courses.homeworkReminder
 ```
 
 没有外键约束。理由：同步场景下删除是墓碑，外键会阻碍乱序应用；一致性由应用层维护。
+
+**课程 → 日程的唯一约定**：课程是「计划」，Task 是「日程」。
+- 上课时段：导入时为每个时段（按周次拆段）建一条带 `rrule` 的 `kind=event` Task，幂等键是标签 `course:<id>` + `slot:<星期-节次-起始周>`；
+- 考核项 / 每周作业：每条记录对应一条真实 Task（`taskId` 回指），标题带 `[课程名]` 前缀，`goalId` 继承课程的 `goalId`。
+  因为提醒调度扫的是 `tasks` 表、日历与四象限也只读 Task，没有 Task 的记录只是「计划」，不会出现在日程里。
 
 ---
 
@@ -123,6 +138,14 @@ ai.enabled               boolean
 ai.mcpEnabled            boolean
 ```
 
+课程相关（`packages/shared/src/courses.ts` 里的 `COURSE_SETTING_KEYS`）：
+
+```
+courses.semesterStart     "2026-09-07"    学期第 1 周周一；课程自己的 semesterStart 优先
+courses.periodTimes       [{start:"08:00",end:"08:45"}, …]  11 节作息，默认川大江安
+courses.homeworkReminder  {enabled:true, weekday:7, time:"20:00"}  每周作业遗漏提醒的时刻
+```
+
 ---
 
 ## 4. 投影列（DB 里的冗余字段）
@@ -140,6 +163,9 @@ ai.mcpEnabled            boolean
 | `kpi_entries` | kpi_id, date |
 | `pomodoro_sessions` | task_id, started_at |
 | `mind_nodes` | map_id, parent_id |
+| `courses` | archived, goal_id |
+| `assessments` | course_id, status, kind, due_at |
+| `assignments` | course_id, week_no, status, due_at |
 | `settings` | key（唯一索引 user_id+key） |
 
 **payload 才是权威**：读取时以 payload 为准，投影列只用于 `where/order by`。

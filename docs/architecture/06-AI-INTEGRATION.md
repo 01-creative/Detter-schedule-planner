@@ -148,6 +148,43 @@ Content-Type: application/json
 | `get_agenda` | `date?` | 某天日程（默认今天） |
 | `get_context_pack` | `range?` | 上下文包 |
 | `search` | `q` `limit?` | 全局搜索（任务/目标/收件箱） |
+| `list_courses` | `includeArchived?` | 课程 + 权重合计 + 本周周次 / 是否缺作业 |
+| `create_course` | `name` `code?` `teacher?` `credits?` `semesterStart?` `weeklyHomework?` `goalId?` | 建课程 |
+| `update_course` | `courseId?`/`course?` + 任意字段 | 改课程（可归档） |
+| `add_assessment` | `courseId?`/`course?` `title` `kind?` `weight?` `date?` `note?` | 加考核项，**自动建 Task** |
+| `add_assignment` | `courseId?`/`course?` `title` `weekNo?` `date?` | 记一次每周作业，自动建 Task |
+| `get_course_plan` | `courseId?`/`course?` | 完整考核计划 + 占分构成 + 作业历史 + 缺记的周 |
+| `set_semester_start` | `date` `courseId?` | 设置学期第 1 周周一（全局或单门课） |
+
+**课程工具的宽松约定**（为了让「把 PPT 拍照发给 AI」这条路走得通）：
+- 课程参数 `course` 传课程名即可，**不存在时自动建课**（`add_assignment` 会把新课程标记为「每周有作业」）；
+- 日期参数接受 `2026-12-01`（按当天 23:59 处理）或 ISO 时间戳（带时区则按绝对时间）；
+- 权重接受 `30` / `"30%"` / `"30分"`，负数与无法解析的值报参数错误，超过 100 夹到 100；
+- 考核项与作业都会生成真实 Task（标题形如 `[英语] 大作业`），因此**日历、四象限与提醒立即可见**。
+
+调用示例（Cursor / Claude Desktop 的工具调用等价于下面这段 curl）：
+
+```bash
+curl -sS http://127.0.0.1:8778/api/v1/mcp \
+  -H "authorization: Bearer dtk_xxxxxxxx_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"add_assessment","arguments":{
+        "course":"英语","title":"大作业","kind":"project","weight":"30%","date":"2026-12-01"}}}'
+```
+
+返回（`content[0].text` 里是这份 JSON 的字符串）：
+
+```json
+{
+  "course": { "id": "0199…", "name": "英语", "created": true },
+  "assessment": {
+    "id": "0199…", "courseId": "0199…", "title": "大作业", "kind": "project",
+    "weight": 30, "dueAt": 1796140799999, "status": "planned", "taskId": "0199…"
+  },
+  "task": { "id": "0199…", "title": "[英语] 大作业", "dueAt": 1796140799999 },
+  "weight": { "total": 30, "remaining": 70, "overflow": 0, "count": 1, "byKind": [ … ] }
+}
+```
 
 **设计原则**：
 - 工具名用动词开头，参数扁平，避免嵌套对象（模型更容易填对）。

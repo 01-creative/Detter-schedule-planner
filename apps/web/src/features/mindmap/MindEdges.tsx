@@ -29,6 +29,7 @@ function MindEdgesInner({ edges, selectedId }: MindEdgesProps) {
         return (
           <path
             key={edge.id}
+            data-edge-id={edge.id}
             d={edge.path}
             fill="none"
             strokeWidth={selected ? 2 : 1.5}

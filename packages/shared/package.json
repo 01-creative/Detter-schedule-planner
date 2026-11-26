@@ -10,7 +10,9 @@
     "./sync": "./src/sync.ts",
     "./nlp": "./src/nlp.ts",
     "./time": "./src/time.ts",
-    "./quadrant": "./src/quadrant.ts"
+    "./quadrant": "./src/quadrant.ts",
+    "./courses": "./src/courses.ts",
+    "./timetable": "./src/timetable.ts"
   },
   "types": "./src/index.ts",
   "scripts": {

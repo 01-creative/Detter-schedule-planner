@@ -1,4 +1,11 @@
-import { ENTITY_SCHEMAS, ENTITY_TABLES, TASK_STATUSES } from "@detter/shared";
+import {
+  ASSESSMENT_KINDS,
+  ASSESSMENT_STATUSES,
+  ASSIGNMENT_STATUSES,
+  ENTITY_SCHEMAS,
+  ENTITY_TABLES,
+  TASK_STATUSES,
+} from "@detter/shared";
 import type { EntityName } from "@detter/shared";
 import type { Db, DbStatement, SqlParam } from "../db/types";
 import { PROJECTION_COLUMNS, projectValues } from "../db/projections";
@@ -255,6 +262,28 @@ function buildFilters(entity: EntityName, query: Record<string, string | undefin
     params.push(value);
   };
 
+  /** 毫秒时间戳区间（含边界）；空串等价于不传。 */
+  const numericRange = (column: string, fromRaw: string | undefined, toRaw: string | undefined): void => {
+    const parse = (value: string | undefined, label: string): number | null => {
+      if (value === undefined || value === "") return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        throw new ApiError("validation_error", `${label} 必须是毫秒时间戳`, { value });
+      }
+      return Math.trunc(parsed);
+    };
+    const from = parse(fromRaw, "from");
+    const to = parse(toRaw, "to");
+    if (from !== null) {
+      conditions.push(`${column} >= ?`);
+      params.push(from);
+    }
+    if (to !== null) {
+      conditions.push(`${column} <= ?`);
+      params.push(to);
+    }
+  };
+
   switch (entity) {
     case "task": {
       if (query.status !== undefined && query.status !== "") {
@@ -341,6 +370,51 @@ function buildFilters(entity: EntityName, query: Record<string, string | undefin
       text("map_id", query.mapId);
       text("parent_id", query.parentId);
       break;
+    case "course": {
+      // 归档是 0/1 投影列。三种语义：
+      //   archived=true|false → 只看归档 / 只看在用
+      //   includeArchived=true → 全都看（导出、审计场景）
+      //   都不传 → 默认只看在用的课（与 list_courses / 页面一致）
+      const archivedRaw = query.archived;
+      if (archivedRaw !== undefined && archivedRaw !== "") {
+        conditions.push("archived = ?");
+        params.push(parseBoolean(archivedRaw) ? 1 : 0);
+      } else if (!parseBoolean(query.includeArchived)) {
+        conditions.push("archived = 0");
+      }
+      text("goal_id", query.goalId);
+      if (query.q !== undefined && query.q !== "") {
+        conditions.push("json_extract(payload, '$.name') LIKE ? ESCAPE '\\'");
+        params.push(`%${escapeLike(query.q)}%`);
+      }
+      break;
+    }
+    case "assessment": {
+      text("course_id", query.courseId);
+      if (query.status !== undefined && query.status !== "") {
+        assertEnum(query.status, ASSESSMENT_STATUSES, "status");
+        conditions.push("status = ?");
+        params.push(query.status);
+      }
+      if (query.kind !== undefined && query.kind !== "") {
+        assertEnum(query.kind, ASSESSMENT_KINDS, "kind");
+        conditions.push("kind = ?");
+        params.push(query.kind);
+      }
+      numericRange("due_at", query.from, query.to);
+      break;
+    }
+    case "assignment": {
+      text("course_id", query.courseId);
+      numeric("week_no", query.weekNo);
+      if (query.status !== undefined && query.status !== "") {
+        assertEnum(query.status, ASSIGNMENT_STATUSES, "status");
+        conditions.push("status = ?");
+        params.push(query.status);
+      }
+      numericRange("due_at", query.from, query.to);
+      break;
+    }
     case "setting":
       text("key", query.key);
       break;

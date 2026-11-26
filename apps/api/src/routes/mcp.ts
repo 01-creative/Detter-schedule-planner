@@ -41,8 +41,9 @@ const INSTRUCTIONS = [
   "Detter 是本地优先的四象限日程管理器。",
   "工具返回结构化 JSON，不会返回 Markdown；请自行组织语言。",
   "时间参数一律使用毫秒时间戳（用户时区 Asia/Shanghai），不要传 ISO 字符串。",
+  "课程相关工具（add_assessment / add_assignment / set_semester_start）是例外：日期可传 2026-12-01 或 ISO 字符串，权重可传 30 或 \"30%\"；课程不存在时会按课程名自动创建。",
   "quadrant: 1=重要且紧急，2=重要不紧急，3=紧急不重要，4=不重要不紧急。",
-  "写操作需要该 API Key 具备 write scope；不确定时先用 list_tasks / get_agenda 查看现状。",
+  "写操作需要该 API Key 具备 write scope；不确定时先用 list_tasks / get_agenda / list_courses 查看现状。",
 ].join("");
 
 function rpcResult(id: RpcId, result: unknown): Record<string, unknown> {

@@ -12,6 +12,8 @@ import { RedirectIfAuthenticated, RequireAuth } from "./guards";
  */
 const InboxPage = lazy(() => import("@/pages/InboxPage"));
 const CalendarPage = lazy(() => import("@/pages/CalendarPage"));
+const CoursesPage = lazy(() => import("@/pages/CoursesPage"));
+const CourseDetailPage = lazy(() => import("@/pages/CourseDetailPage"));
 const OkrPage = lazy(() => import("@/pages/OkrPage"));
 const ReviewPage = lazy(() => import("@/pages/ReviewPage"));
 const KpiPage = lazy(() => import("@/pages/KpiPage"));
@@ -48,6 +50,8 @@ export function AppRouter() {
           <Route index element={<QuadrantPage />} />
           <Route path="inbox" element={<InboxPage />} />
           <Route path="calendar" element={<CalendarPage />} />
+          <Route path="courses" element={<CoursesPage />} />
+          <Route path="courses/:courseId" element={<CourseDetailPage />} />
           <Route path="okr" element={<OkrPage />} />
           <Route path="review" element={<ReviewPage />} />
           <Route path="kpi" element={<KpiPage />} />

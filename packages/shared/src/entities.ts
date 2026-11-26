@@ -85,6 +85,7 @@ export const MIND_NODE_KINDS = ["idea", "goal", "task", "kr", "note"] as const;
 export const MindNodeKindSchema = z.enum(MIND_NODE_KINDS);
 export type MindNodeKind = z.infer<typeof MindNodeKindSchema>;
 
+
 /* -------------------------------------------------------------------------- */
 /*                                 同步基座                                    */
 /* -------------------------------------------------------------------------- */
@@ -402,6 +403,90 @@ export type MindNode = z.infer<typeof MindNodeSchema>;
 export type MindNodeInput = z.input<typeof MindNodeSchema>;
 
 /* -------------------------------------------------------------------------- */
+/*                                  课程                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 课程能力的三张表（Course / Assessment / Assignment）。
+ *
+ * 为什么课程不直接复用 Goal：Goal 是「方向」，一门课有学期边界、上课时段、考核构成与
+ * 每周作业，语义密度高得多；把它们塞进 Goal 的 milestones 会让日历与权重计算都变形。
+ *
+ * 与 Task 的关系（关键约定）：
+ * - 上课时段 → 一条带 rrule 的 Task（kind=event），日历/四象限/提醒全部复用既有实现；
+ * - 考核项  → 一条 Task（taskId 回指），因为提醒调度、日历、四象限只认 Task；
+ * - 每周作业 → 一条 Task（taskId 回指），同上。
+ * 也就是说：**课程是「计划」，Task 是「日程」**，两边靠 id 关联，Task 永远是权威的日程载体。
+ */
+export const ASSESSMENT_KINDS = ["homework", "project", "exam", "quiz", "attendance", "other"] as const;
+export const AssessmentKindSchema = z.enum(ASSESSMENT_KINDS);
+export type AssessmentKind = z.infer<typeof AssessmentKindSchema>;
+
+export const ASSESSMENT_STATUSES = ["planned", "submitted", "done", "graded"] as const;
+export const AssessmentStatusSchema = z.enum(ASSESSMENT_STATUSES);
+export type AssessmentStatus = z.infer<typeof AssessmentStatusSchema>;
+
+export const ASSIGNMENT_STATUSES = ["todo", "done", "skipped"] as const;
+export const AssignmentStatusSchema = z.enum(ASSIGNMENT_STATUSES);
+export type AssignmentStatus = z.infer<typeof AssignmentStatusSchema>;
+
+export const CourseSchema = z.object({
+  ...baseEntityShape,
+  name: z.string().min(1).max(200),
+  /** 教务系统里的课程号（课表 HTML 里课程名末尾的 `_42` 就是它） */
+  code: z.string().default(""),
+  teacher: z.string().default(""),
+  /** 学分；允许小数（0.5 学分的实践课很常见） */
+  credits: z.number().min(0).max(50).nullable().default(null),
+  color: z.string().default("#6366F1"),
+  /** 学期第 1 周周一的日期，YYYY-MM-DD；为空时回落到设置里的全局学期起点 */
+  semesterStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+  /** 这门课是否每周都有作业：用于「这周还没记作业」的遗漏判定与周日提醒 */
+  weeklyHomework: z.boolean().default(false),
+  note: z.string().default(""),
+  archived: z.boolean().default(false),
+  /** 关联到某个 Goal 时，自动生成的 Task 会继承它（课程的「大目标」） */
+  goalId: z.string().nullable().default(null),
+  sortIndex: z.number().default(0),
+});
+export type Course = z.infer<typeof CourseSchema>;
+export type CourseInput = z.input<typeof CourseSchema>;
+
+export const AssessmentSchema = z.object({
+  ...baseEntityShape,
+  courseId: z.string().min(1),
+  title: z.string().min(1).max(200),
+  kind: AssessmentKindSchema.default("homework"),
+  /** 占总评百分比 0..100；不做「合计必须等于 100」的强校验，剩余部分由 UI 提示 */
+  weight: z.number().min(0).max(100).default(0),
+  /** 截止时间（毫秒）；考试类通常只用 startAt */
+  dueAt: z.number().int().nullable().default(null),
+  startAt: z.number().int().nullable().default(null),
+  note: z.string().default(""),
+  status: AssessmentStatusSchema.default("planned"),
+  /** 得分（0..100）；只有 graded 时才有意义 */
+  score: z.number().min(0).max(100).nullable().default(null),
+  /** 自动生成的 Task ID（提醒/日历/四象限只认 Task） */
+  taskId: z.string().nullable().default(null),
+});
+export type Assessment = z.infer<typeof AssessmentSchema>;
+export type AssessmentInput = z.input<typeof AssessmentSchema>;
+
+export const AssignmentSchema = z.object({
+  ...baseEntityShape,
+  courseId: z.string().min(1),
+  /** 学期第几周，从 1 开始 */
+  weekNo: z.number().int().min(1).max(60),
+  title: z.string().min(1).max(200),
+  dueAt: z.number().int().nullable().default(null),
+  status: AssignmentStatusSchema.default("todo"),
+  note: z.string().default(""),
+  taskId: z.string().nullable().default(null),
+});
+export type Assignment = z.infer<typeof AssignmentSchema>;
+export type AssignmentInput = z.input<typeof AssignmentSchema>;
+
+/* -------------------------------------------------------------------------- */
 /*                             设置 / 设备 / 提醒                               */
 /* -------------------------------------------------------------------------- */
 
@@ -441,6 +526,9 @@ export const ENTITY_NAMES = [
   "pomodoro",
   "mindMap",
   "mindNode",
+  "course",
+  "assessment",
+  "assignment",
   "setting",
 ] as const;
 export type EntityName = (typeof ENTITY_NAMES)[number];
@@ -457,6 +545,9 @@ export const ENTITY_SCHEMAS = {
   pomodoro: PomodoroSessionSchema,
   mindMap: MindMapSchema,
   mindNode: MindNodeSchema,
+  course: CourseSchema,
+  assessment: AssessmentSchema,
+  assignment: AssignmentSchema,
   setting: SettingSchema,
 } as const satisfies Record<EntityName, z.ZodTypeAny>;
 
@@ -472,6 +563,9 @@ export const ENTITY_TABLES = {
   pomodoro: "pomodoro_sessions",
   mindMap: "mind_maps",
   mindNode: "mind_nodes",
+  course: "courses",
+  assessment: "assessments",
+  assignment: "assignments",
   setting: "settings",
 } as const satisfies Record<EntityName, string>;
 
@@ -487,5 +581,8 @@ export const ENTITY_INDEX_HINTS: Record<EntityName, string[]> = {
   pomodoro: ["taskId", "startedAt"],
   mindMap: ["goalId"],
   mindNode: ["mapId", "parentId"],
+  course: ["archived", "goalId"],
+  assessment: ["courseId", "status", "kind", "dueAt"],
+  assignment: ["courseId", "weekNo", "status"],
   setting: ["key"],
 };

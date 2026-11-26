@@ -21,6 +21,9 @@ export const PROJECTION_COLUMNS: Record<EntityName, string[]> = {
   pomodoro: ["task_id", "started_at"],
   mindMap: ["goal_id"],
   mindNode: ["map_id", "parent_id"],
+  course: ["archived", "goal_id"],
+  assessment: ["course_id", "status", "kind", "due_at"],
+  assignment: ["course_id", "week_no", "status", "due_at"],
   setting: ["key"],
 };
 
@@ -95,6 +98,23 @@ function projectValue(entity: EntityName, column: string, payload: Payload): Sql
     case "mindNode":
       if (column === "map_id") return asText(payload.mapId);
       if (column === "parent_id") return nullableText(payload.parentId);
+      return null;
+    case "course":
+      // archived 是布尔，投影成 0/1 才能直接进 WHERE
+      if (column === "archived") return payload.archived === true ? 1 : 0;
+      if (column === "goal_id") return nullableText(payload.goalId);
+      return null;
+    case "assessment":
+      if (column === "course_id") return asText(payload.courseId);
+      if (column === "status") return asText(payload.status);
+      if (column === "kind") return asText(payload.kind);
+      if (column === "due_at") return nullableNumber(payload.dueAt);
+      return null;
+    case "assignment":
+      if (column === "course_id") return asText(payload.courseId);
+      if (column === "week_no") return asNumber(payload.weekNo);
+      if (column === "status") return asText(payload.status);
+      if (column === "due_at") return nullableNumber(payload.dueAt);
       return null;
     case "setting":
       return column === "key" ? asText(payload.key) : null;

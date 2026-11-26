@@ -20,6 +20,7 @@ import {
 } from "./camera";
 import {
   cullLayout,
+  edgePath,
   layoutMindMap,
   type LayoutNode,
 } from "./layout";
@@ -83,6 +84,21 @@ export interface MindMapStageProps {
   className?: string;
 }
 
+/**
+ * 拖动期间要跟着动的连线。
+ *
+ * 节点拖拽刻意不进 state（直接改 transform，避免每次 pointermove 都重排整棵树），
+ * 代价是 SVG 里的连线还停在旧位置。这里把「与拖动节点相连的那几条边」缓存下来，
+ * 在同一个 rAF 里用 edgePath 重算 d，松手后由 React 用新布局覆盖回去。
+ */
+interface DragEdge {
+  el: SVGPathElement | null;
+  fromId: string;
+  toId: string;
+  /** 原始 d，用于取消拖动时复原 */
+  path: string;
+}
+
 interface DragSession {
   id: string;
   pointerId: number;
@@ -93,6 +109,7 @@ interface DragSession {
   targetId: string | null;
   element: HTMLElement | null;
   exclude: Set<string>;
+  edges: DragEdge[];
 }
 
 interface PanSession {
@@ -343,6 +360,30 @@ export function MindMapStage({
     return culled.nodes.map((node) => toScreenRect(node.id, node, cameraRef.current));
   }, [culled.nodes]);
 
+  /**
+   * 拖动时同步连线：把与被拖节点相连的几条边按新位置重算。
+   * position 传 null 表示复原成布局算出来的原始路径（取消拖动 / 拖到非法目标）。
+   */
+  const syncDragEdges = useCallback(
+    (drag: DragSession, position: Point | null) => {
+      if (drag.edges.length === 0) return;
+      const self = layout.byId.get(drag.id);
+      for (const edge of drag.edges) {
+        if (!edge.el) continue;
+        if (!position || !self) {
+          edge.el.setAttribute("d", edge.path);
+          continue;
+        }
+        const moved = { ...self, x: position.x, y: position.y };
+        const from = edge.fromId === drag.id ? moved : layout.byId.get(edge.fromId);
+        const to = edge.toId === drag.id ? moved : layout.byId.get(edge.toId);
+        if (!from || !to) continue;
+        edge.el.setAttribute("d", edgePath(from, to));
+      }
+    },
+    [layout],
+  );
+
   const finishDrag = useCallback(
     (event: PointerEvent) => {
       const drag = dragRef.current;
@@ -358,6 +399,7 @@ export function MindMapStage({
         if (drag.element) {
           drag.element.style.transform = `translate3d(${drag.origin.x}px, ${drag.origin.y}px, 0)`;
         }
+        syncDragEdges(drag, null);
         return;
       }
 
@@ -399,6 +441,7 @@ export function MindMapStage({
           if (drag.element) {
             drag.element.style.transform = `translate3d(${drag.origin.x}px, ${drag.origin.y}px, 0)`;
           }
+          syncDragEdges(drag, null);
           return;
         }
       }
@@ -440,6 +483,18 @@ export function MindMapStage({
       if (editingId === layoutNode.id) return;
 
       const element = cardRefs.current.get(layoutNode.id) ?? null;
+
+      /* 先缓存与这个节点相连的边：拖动过程中只更新它们，不整树重排 */
+      const edgeLayer = containerRef.current?.querySelector('[data-testid="mindmap-edges"]') ?? null;
+      const edges: DragEdge[] = layout.edges
+        .filter((edge) => edge.fromId === layoutNode.id || edge.toId === layoutNode.id)
+        .map((edge) => ({
+          el: edgeLayer?.querySelector<SVGPathElement>(`[data-edge-id="${edge.id}"]`) ?? null,
+          fromId: edge.fromId,
+          toId: edge.toId,
+          path: edge.path,
+        }));
+
       const drag: DragSession = {
         id: layoutNode.id,
         pointerId: event.pointerId,
@@ -450,6 +505,7 @@ export function MindMapStage({
         targetId: null,
         element,
         exclude: new Set(subtreeIds(layout.tree, layoutNode.id)),
+        edges,
       };
       dragRef.current = drag;
 
@@ -468,6 +524,8 @@ export function MindMapStage({
         drag.current = { x, y };
         // 关键：直接改 style，不进 state
         if (drag.element) drag.element.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        // 连线跟着一起动，否则拖节点时线还挂在原地
+        syncDragEdges(drag, { x, y });
 
         const container = containerRef.current;
         if (!container) return;

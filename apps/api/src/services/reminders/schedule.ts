@@ -2,6 +2,7 @@ import { formatDuration } from "@detter/shared";
 import type { Db, DbStatement } from "../../db/types";
 import { uuidv7 } from "../../lib/ids";
 import { changeStatement, updateEntityStatement } from "../../repo/crud";
+import { runHomeworkDigest } from "../courses/digest";
 import { REMINDER_HORIZON_DAYS, REMINDER_MAX_ATTEMPTS, readReminderConfig, type ReadConfigOptions } from "./config";
 import { getNotifier } from "./notifiers";
 import { parseVapidCredentials } from "./webpush/vapid";
@@ -135,6 +136,8 @@ export interface ReminderTickOptions {
   /** 只跑某个用户（测试/排障用；正常 cron 不传） */
   userId?: string;
   maxRounds?: number;
+  /** 是否顺带跑「本周还没记作业」的汇总提醒；默认开，单测可关 */
+  homeworkDigest?: boolean;
 }
 
 export interface ReminderTickSummary {
@@ -148,6 +151,8 @@ export interface ReminderTickSummary {
   downgraded: number;
   expired: number;
   skipped: number;
+  /** 本次 tick 写出的「本周还没记作业」汇总通知条数 */
+  digest: number;
   errors: string[];
 }
 
@@ -163,6 +168,7 @@ function emptySummary(): ReminderTickSummary {
     downgraded: 0,
     expired: 0,
     skipped: 0,
+    digest: 0,
     errors: [],
   };
 }
@@ -583,6 +589,22 @@ export async function runReminderTick(
           processed.add(row.id);
           summary.processed += 1;
           await processReminder(db, row, config, context, now, summary);
+        }
+      }
+
+      /**
+       * 课程遗漏提醒（T15）：一次性汇总通知，不经过 reminders 表——
+       * 它没有 Task 可挂，而复用 notifications.reminder_id 的唯一索引就能做到幂等。
+       * 放在投递之后：同一分钟内用户先收到到点提醒，再看到「这周还没记作业」。
+       */
+      if (options.homeworkDigest !== false) {
+        try {
+          const digest = await runHomeworkDigest(db, userId, now);
+          if (digest.emitted) summary.digest += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          summary.errors.push(`user ${userId.slice(0, 8)} digest: ${message}`);
+          console.error(`[reminders] 课程遗漏提醒失败 user=${userId.slice(0, 8)}: ${message}`);
         }
       }
     } catch (error) {
