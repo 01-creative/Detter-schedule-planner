@@ -23,6 +23,9 @@ const url = args.url ?? "http://127.0.0.1:5173";
 const out = args.out ?? ".qa";
 const tag = args.tag ?? "home";
 const waitMs = Number(args.wait ?? 1200);
+const password = args.password ?? "";
+const setupToken = args.token ?? "";
+const path0 = args.path ?? "/";
 
 const viewports = [
   { name: "1440", width: 1440, height: 900 },
@@ -35,12 +38,43 @@ await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 const report = { url, tag, at: new Date().toISOString(), pages: [] };
 
+/**
+ * 需要看登录后的页面时传 --password（首次用 --token 初始化）。
+ * 单独一个 context 做登录，再把 storageState 复用到三个视口，避免重复登录。
+ */
+let storageState;
+if (password) {
+  const authCtx = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: "zh-CN" });
+  const authPage = await authCtx.newPage();
+  await authPage.goto(url, { waitUntil: "domcontentloaded" }).catch(() => {});
+  await authPage.waitForTimeout(600);
+
+  if (authPage.url().includes("/setup")) {
+    if (!setupToken) throw new Error("站点尚未初始化：请传 --token=<setupToken>");
+    const inputs = authPage.locator("input");
+    await inputs.nth(0).fill(setupToken);
+    await inputs.nth(1).fill(password);
+    const third = inputs.nth(2);
+    if ((await third.count()) > 0) await third.fill(password);
+    await authPage.getByRole("button").filter({ hasText: /创建|初始化|设置|开始/ }).first().click();
+    await authPage.waitForTimeout(1500);
+  } else if (authPage.url().includes("/login")) {
+    await authPage.locator("input[type=password]").first().fill(password);
+    await authPage.getByRole("button").filter({ hasText: /登录|进入|继续/ }).first().click();
+    await authPage.waitForTimeout(1500);
+  }
+
+  storageState = await authCtx.storageState();
+  await authCtx.close();
+}
+
 for (const vp of viewports) {
   const context = await browser.newContext({
     viewport: { width: vp.width, height: vp.height },
     deviceScaleFactor: 1,
     locale: "zh-CN",
     timezoneId: "Asia/Shanghai",
+    ...(storageState ? { storageState } : {}),
   });
   const page = await context.newPage();
 
@@ -59,7 +93,7 @@ for (const vp of viewports) {
   });
 
   const started = Date.now();
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 }).catch(() => {});
+  await page.goto(url.replace(/\/$/, "") + path0, { waitUntil: "domcontentloaded", timeout: 30_000 }).catch(() => {});
   const domMs = Date.now() - started;
   await page.waitForTimeout(waitMs);
 
