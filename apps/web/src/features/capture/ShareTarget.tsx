@@ -29,6 +29,29 @@ function buildRawText(params: URLSearchParams): string {
   return `${head} ${url}`;
 }
 
+/**
+ * 最近已处理过的分享内容（值 = 时间戳）。
+ *
+ * 为什么要模块级而不是 useRef：React StrictMode 在开发环境会「挂载 → 卸载 → 再挂载」，
+ * 第一次 effect 的定时器会被 cleanup 清掉，而 ref 仍然保留 true，
+ * 导致第二次 effect 直接短路 —— 表现就是 dev 下「正在收进盒子…」永远不动。
+ * 改成模块级去重表 + 只在真正写库前打标记，两种情况都能正确处理。
+ */
+const RECENT_WINDOW_MS = 5_000;
+const recentlyHandled = new Map<string, number>();
+
+function wasHandled(raw: string): boolean {
+  const now = Date.now();
+  for (const [key, at] of recentlyHandled) {
+    if (now - at > RECENT_WINDOW_MS) recentlyHandled.delete(key);
+  }
+  return recentlyHandled.has(raw);
+}
+
+function markHandled(raw: string): void {
+  recentlyHandled.set(raw, Date.now());
+}
+
 export function ShareTarget() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -41,22 +64,27 @@ export function ShareTarget() {
   const [status, setStatus] = useState<"saving" | "saved" | "empty">(
     raw ? "saving" : "empty",
   );
-  const handledRef = useRef(false);
 
   useEffect(() => {
-    if (!raw || handledRef.current) return;
-    handledRef.current = true;
+    if (!raw) return;
 
     /**
      * 等一小会儿再解析：goals 是 useLiveQuery 异步读出来的，
      * 立刻解析会丢掉 `@目标` 匹配。150ms 足够本地库返回，又不影响「秒收」的手感。
      */
     const timer = window.setTimeout(() => {
+      // 同一个分享内容短时间内重复处理（StrictMode 二次挂载 / 后退再前进）直接跳过写库
+      if (wasHandled(raw)) {
+        setStatus("saved");
+        return;
+      }
+
       const parsed = parseQuickCapture(raw, {
         goals: goalsRef.current.map((goal) => ({ id: goal.id, title: goal.title })),
       });
       void saveCapture({ rawText: raw, parsed, source: "share" })
         .then(() => {
+          markHandled(raw);
           setStatus("saved");
           toast({ title: "已收进盒子 ✓", description: parsed.title, tone: "success" });
         })
