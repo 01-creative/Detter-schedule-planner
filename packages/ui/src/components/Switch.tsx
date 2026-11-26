@@ -20,6 +20,10 @@ export function Switch({ checked, onCheckedChange, label, disabled, className }:
       onClick={() => onCheckedChange(!checked)}
       className={cn(
         "relative inline-flex h-6 w-10 shrink-0 items-center rounded-full border border-border-strong",
+        // 40×24 的视觉不变，命中区补到 44×44。
+        // 注意 ::after 的定位参照是「内边距盒」，这个开关有 1px 描边，
+        // 所以要多借 1px 才能真的到 44：上下各 11px、左右各 3px。
+        "after:absolute after:-inset-y-[11px] after:-inset-x-[3px] after:content-['']",
         "transition-colors duration-[var(--dur-2)] ease-out",
         checked ? "border-transparent gradient-accent" : "bg-surface-sunken",
         disabled && "cursor-not-allowed opacity-50",

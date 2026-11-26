@@ -63,7 +63,7 @@ export function InlineComposer({
               onCancel();
             }
           }}
-          className="h-7 min-w-0 flex-1 bg-transparent text-body text-ink-900 outline-none placeholder:text-ink-300"
+          className="h-11 -my-2 min-w-0 flex-1 bg-transparent text-body text-ink-900 outline-none placeholder:text-ink-300"
         />
       </div>
       <p className="mt-1 pl-5 text-micro text-ink-300">Enter 保存 · Esc 取消</p>

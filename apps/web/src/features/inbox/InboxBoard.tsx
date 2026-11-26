@@ -298,7 +298,10 @@ export function InboxBoard() {
               aria-pressed={filter === value}
               onClick={() => setFilter(value)}
               className={cn(
-                "h-6 rounded-full px-2.5 text-micro transition-colors duration-[var(--dur-1)]",
+                "relative h-6 rounded-full px-2.5 text-micro transition-colors duration-[var(--dur-1)]",
+                // 命中区 44 高（视觉 24）：上下各借 10px，落到筛选行 8px 的行间距里；
+                // 左右各借 2px，吃掉 gap-1 的一半，彼此不重叠。
+                "after:absolute after:-inset-y-2.5 after:-inset-x-0.5 after:content-['']",
                 filter === value
                   ? "bg-accent-soft text-accent"
                   : "text-ink-500 hover:text-ink-900",
@@ -368,7 +371,9 @@ export function InboxBoard() {
         </div>
       )}
 
-      <div className="mt-4">
+      {/* 底部安全区：FAB 是 fixed 的（56px、距底 72px），主内容区原有的 96px 下边距不够，
+          滚到底时最后一条卡片的「一键整理」会被它压住。这里再留 56px，让列表收在 FAB 上方。 */}
+      <div className="mt-4 pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
         {loading ? (
           <LoadingState rows={3} />
         ) : items.length === 0 ? (

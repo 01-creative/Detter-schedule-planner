@@ -194,7 +194,7 @@ export function InboxCard({
                         <button
                           type="button"
                           aria-label="更多操作"
-                          className="relative inline-flex size-7 items-center justify-center rounded-md text-ink-500 transition-colors duration-[var(--dur-1)] after:absolute after:-inset-1 after:content-[''] hover:bg-surface-sunken hover:text-ink-900"
+                          className="relative inline-flex size-7 items-center justify-center rounded-md text-ink-500 transition-colors duration-[var(--dur-1)] after:absolute after:-inset-y-2 after:-left-1.5 after:-right-2.5 after:content-[''] hover:bg-surface-sunken hover:text-ink-900"
                         >
                           <Ellipsis className="size-4" aria-hidden="true" />
                         </button>

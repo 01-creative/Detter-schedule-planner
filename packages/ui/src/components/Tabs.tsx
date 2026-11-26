@@ -73,6 +73,10 @@ export function Tabs({
             onClick={() => onValueChange(item.value)}
             className={cn(
               "relative inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-caption transition-colors duration-[var(--dur-1)]",
+              // 命中区 44px 高（视觉仍是 32）：伪元素向下/向上各借 6px。
+              // 左右只借 2px —— 相邻 tab 之间只有 4px 间隙，借满会互相盖住，
+              // 点空隙时到底算谁的就很随机了（WCAG 2.5.8 的间距豁免正是这么算的）。
+              "after:absolute after:-inset-y-1.5 after:-inset-x-0.5 after:content-['']",
               variant === "underline" && "-mb-px",
               variant === "pill" && "rounded-full",
               active ? "text-ink-900" : "text-ink-500 hover:text-ink-700",

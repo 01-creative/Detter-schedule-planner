@@ -154,7 +154,9 @@ export function QuadrantCell({
         "border border-white/50 shadow-1 dark:border-white/5",
         "transition-transform duration-[var(--dur-2)] ease-out",
         isOver && "scale-[1.005]",
-        "max-md:min-h-[260px]",
+        // 移动端 260 → 128：格子的高度不该由「最小高度」决定，而该由里面有几张卡决定。
+        // 260 的时候一格只有一张卡也会留 150px 空白，四格叠起来就是半屏 —— 一屏看不满三个象限。
+        "max-md:min-h-[128px]",
       )}
     >
       <header className="flex h-11 shrink-0 items-center gap-2 px-3.5">
@@ -190,8 +192,13 @@ export function QuadrantCell({
             onClick={() => onAdd(quadrant)}
             aria-label={`在「${meta.name}」新建任务`}
             className={cn(
-              "inline-flex size-7 items-center justify-center rounded-md text-ink-500",
+              "relative inline-flex size-7 items-center justify-center rounded-md text-ink-500",
               "transition-colors duration-[var(--dur-1)] hover:bg-surface-solid/70 hover:text-ink-900",
+              // 命中区 44×44（视觉 28）：左边是空白（标题/计数都不是控件），借 14px；
+              // 右边紧邻折叠按钮，只借 2px 刚好填满 4px 间距的一半。
+              "after:absolute after:-inset-y-2 after:-left-3.5 after:-right-0.5 after:content-['']",
+              // 这里不做「悬停才可点」的门控：格头没有别的竞争动作，
+              // 而门控会让触屏平板（≥768 且无 hover）彻底点不到它。
               "opacity-100 md:opacity-0 md:group-hover/cell:opacity-100 md:focus-visible:opacity-100",
             )}
           >
@@ -202,7 +209,11 @@ export function QuadrantCell({
             onClick={() => setCollapsed((value) => !value)}
             aria-expanded={!collapsed}
             aria-label={collapsed ? `展开「${meta.name}」` : `收起「${meta.name}」`}
-            className="inline-flex size-7 items-center justify-center rounded-md text-ink-500 transition-colors duration-[var(--dur-1)] hover:bg-surface-solid/70 hover:text-ink-900 md:hidden"
+            className={cn(
+              "relative inline-flex size-7 items-center justify-center rounded-md text-ink-500 transition-colors duration-[var(--dur-1)] hover:bg-surface-solid/70 hover:text-ink-900 md:hidden",
+              // 同上，方向相反：右边是格头的 14px 内边距，借满正好贴到格边
+              "after:absolute after:-inset-y-2 after:-left-0.5 after:-right-3.5 after:content-['']",
+            )}
           >
             <ChevronDown
               className={cn(
@@ -218,7 +229,7 @@ export function QuadrantCell({
       <div
         data-quadrant-body=""
         className={cn(
-          "relative min-h-0 flex-1 px-2.5 pb-2.5",
+          "relative min-h-0 flex-1 px-2.5 pb-2 md:pb-2.5",
           free ? "overflow-hidden max-md:min-h-[300px]" : "overflow-y-auto overscroll-contain max-md:overflow-visible",
           collapsed && "hidden md:block",
         )}
@@ -265,7 +276,7 @@ export function QuadrantCell({
                 />
               </div>
             )}
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-2 max-md:gap-1.5">
               {tasks.map((task) => (
                 <li
                   key={task.id}

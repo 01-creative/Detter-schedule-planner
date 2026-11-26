@@ -205,6 +205,14 @@ function TaskCardImpl({
         className={cn(
           "absolute top-1.5 right-1.5 inline-flex size-6 items-center justify-center rounded-md",
           "bg-surface-solid/95 text-ink-500 opacity-0 shadow-1 transition-opacity duration-[var(--dur-1)]",
+          // 命中区 44×44（视觉仍是 24）：按钮贴在卡片右上角，伪元素只能往卡片内部借
+          // —— 列表项是 content-visibility:auto（带 paint containment），借出卡片的部分会被裁掉。
+          // 于是右借 6px 到卡片边缘、左借 14px、下借 14px、上借 6px，正好 44×44 且全在卡内。
+          "after:absolute after:-top-1.5 after:-right-1.5 after:-bottom-3.5 after:-left-3.5 after:content-['']",
+          // 桌面端「⋯」平时是透明的：命中区放大后不能顺手变成隐形陷阱，
+          // 所以在「≥md 且真的有 hover 的设备」上，只有 hover 卡片（也就是它已经显形）时才接管指针。
+          // 触屏（hover: none）与窄屏（它本来就常显）都不门控，否则那里会直接点不到。
+          "md:[@media(hover:hover)]:pointer-events-none md:[@media(hover:hover)]:group-hover/card:pointer-events-auto",
           "group-hover/card:opacity-100 focus-visible:opacity-100 max-md:opacity-100",
         )}
       >

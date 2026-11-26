@@ -27,7 +27,10 @@ const DOWNLOADS = [
 ];
 
 const LINK_CLASS =
-  "inline-flex h-7 items-center gap-1.5 rounded-md border border-border-strong bg-surface-solid px-2.5 text-caption font-strong text-ink-900 transition-colors hover:bg-surface-sunken/60";
+  // 视觉 28 高保持不变；命中区靠伪元素补到 44 高。
+  // 1px 描边让 ::after 的参照盒少了 2px，所以是上下各借 9px 而不是 8px。
+  // 宽度本来就在 87px 以上，不必左右扩，也就不会和相邻链接抢点击。
+  "relative inline-flex h-7 items-center gap-1.5 rounded-md border border-border-strong bg-surface-solid px-2.5 text-caption font-strong text-ink-900 transition-colors after:absolute after:-inset-y-[9px] after:inset-x-0 after:content-[''] hover:bg-surface-sunken/60";
 
 export function AiExportSection() {
   const { toast } = useToast();
@@ -81,7 +84,7 @@ export function AiExportSection() {
 
       <div className="border-t border-border pt-3">
         <p className="text-caption text-ink-700">下载</p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-4">
           {DOWNLOADS.map((item) => (
             <a key={item.href} href={item.href} download className={LINK_CLASS}>
               <item.icon className="size-3.5" aria-hidden="true" />

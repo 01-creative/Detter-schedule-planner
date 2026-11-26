@@ -616,12 +616,14 @@ export function QuadrantBoard() {
         goalRailCollapsed={goalRailCollapsed}
       />
 
-      {/* 移动端：Q1–Q4 + 全部，吸在主标题栏下方；按钮自身可压缩，不裁切 */}
+      {/* 移动端：Q1–Q4 + 全部，吸在主标题栏下方；按钮自身可压缩，不裁切。
+          横向滚动放在 nav 上而不是里面那层：里面的圆角胶囊只有 36 高，
+          一旦它自己 overflow-x:auto，分段按钮补出来的 44 命中区会被裁回 36。 */}
       <nav
         aria-label="象限筛选"
-        className="sticky top-[52px] z-20 -mx-4 mt-3 border-b border-border bg-bg/95 px-4 py-2 backdrop-blur md:hidden"
+        className="no-scrollbar sticky top-[52px] z-20 -mx-4 mt-3 overflow-x-auto border-b border-border bg-bg/95 px-4 py-2 backdrop-blur md:hidden"
       >
-        <div className="flex items-center gap-1 overflow-x-auto rounded-full bg-surface-sunken/80 p-1 no-scrollbar">
+        <div className="flex items-center gap-1 rounded-full bg-surface-sunken/80 p-1">
           {([0, ...QUADRANT_ORDER] as const).map((value) => {
             const active = mobileFilter === value;
             const count = value === 0 ? stats.open : openCount(value);
@@ -632,7 +634,10 @@ export function QuadrantBoard() {
                 aria-pressed={active}
                 onClick={() => setMobileFilter(value)}
                 className={cn(
-                  "flex h-7 min-w-0 flex-1 basis-0 items-center justify-center gap-1 rounded-full px-1 text-caption whitespace-nowrap transition-colors duration-[var(--dur-1)]",
+                  "relative flex h-7 min-w-0 flex-1 basis-0 items-center justify-center gap-1 rounded-full px-1 text-caption whitespace-nowrap transition-colors duration-[var(--dur-1)]",
+                  // 分段控件视觉 28 高，命中区补到 44：上下各借 8px（落在 nav 的 py-2 里），
+                  // 左右各借 2px 正好吃掉 gap-1 的一半，不与相邻分段重叠。
+                  "after:absolute after:-inset-y-2 after:-inset-x-0.5 after:content-['']",
                   active
                     ? "bg-surface-solid text-ink-900 shadow-1"
                     : "text-ink-500 hover:text-ink-700",
@@ -653,7 +658,8 @@ export function QuadrantBoard() {
         </div>
       </nav>
 
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:grid-cols-2 md:grid-rows-2 md:gap-4 md:pb-0">
+      {/* 移动端格间距 12 → 8：四格纵向堆叠时这一项直接决定「一屏能看见几个象限」 */}
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-2 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:grid-cols-2 md:grid-rows-2 md:gap-4 md:pb-0">
         {visibleQuadrants.map((quadrant) => (
           <QuadrantCell
             key={quadrant}

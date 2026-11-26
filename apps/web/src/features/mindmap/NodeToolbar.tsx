@@ -71,7 +71,11 @@ function IconButton({ label, onClick, children, active, disabled, tone = "defaul
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex size-7 items-center justify-center rounded-sm transition-colors duration-[var(--dur-1)]",
+        "relative inline-flex size-7 items-center justify-center rounded-sm transition-colors duration-[var(--dur-1)]",
+        // 工具条宽 232 是定死的（stage 按它算贴边），所以视觉不能放大：
+        // 命中区改成「上下各借 8px → 44 高」「左右各借 1px 刚好吃掉 gap-0.5」，
+        // 这样按钮之间永远不重叠，也不会因为命中区交叉点错。
+        "after:absolute after:-inset-y-2 after:-inset-x-px after:content-['']",
         "text-ink-500 hover:bg-surface-sunken hover:text-ink-900",
         active && "bg-accent-soft text-accent",
         tone === "danger" && "hover:bg-danger-soft hover:text-danger-ink",
@@ -132,7 +136,7 @@ export function NodeToolbar({
             aria-label="关联目标"
             title={goalTitle ? `已关联：${goalTitle}` : "关联目标"}
             className={cn(
-              "inline-flex size-7 items-center justify-center rounded-sm text-ink-500 transition-colors duration-[var(--dur-1)] hover:bg-surface-sunken hover:text-ink-900",
+              "relative inline-flex size-7 items-center justify-center rounded-sm text-ink-500 transition-colors duration-[var(--dur-1)] after:absolute after:-inset-y-2 after:-inset-x-px after:content-[''] hover:bg-surface-sunken hover:text-ink-900",
               linkedGoalId && "bg-accent-soft text-accent",
             )}
           >
@@ -151,7 +155,7 @@ export function NodeToolbar({
               role="menuitem"
               onClick={() => onLinkGoal(goal.id)}
               className={cn(
-                "flex h-8 items-center gap-2 rounded-sm px-2 text-left text-caption transition-colors duration-[var(--dur-1)] hover:bg-surface-sunken",
+                "flex h-11 items-center gap-2 rounded-sm px-2 text-left text-caption transition-colors duration-[var(--dur-1)] hover:bg-surface-sunken",
                 linkedGoalId === goal.id ? "text-accent" : "text-ink-700",
               )}
             >
@@ -168,7 +172,7 @@ export function NodeToolbar({
               type="button"
               role="menuitem"
               onClick={() => onLinkGoal("")}
-              className="mt-1 flex h-8 items-center rounded-sm px-2 text-left text-caption text-ink-500 hover:bg-surface-sunken"
+              className="mt-1 flex h-11 items-center rounded-sm px-2 text-left text-caption text-ink-500 hover:bg-surface-sunken"
             >
               取消关联
             </button>
@@ -184,7 +188,7 @@ export function NodeToolbar({
             type="button"
             aria-label="上色"
             title="上色"
-            className="inline-flex size-7 items-center justify-center rounded-sm text-ink-500 transition-colors duration-[var(--dur-1)] hover:bg-surface-sunken hover:text-ink-900"
+            className="relative inline-flex size-7 items-center justify-center rounded-sm text-ink-500 transition-colors duration-[var(--dur-1)] after:absolute after:-inset-y-2 after:-inset-x-px after:content-[''] hover:bg-surface-sunken hover:text-ink-900"
           >
             <Palette className="size-3.5" aria-hidden="true" />
           </button>
@@ -195,7 +199,7 @@ export function NodeToolbar({
             type="button"
             aria-label="默认颜色"
             onClick={() => onColor(null)}
-            className="size-5 rounded-full border border-border-strong bg-surface-solid"
+            className="relative size-5 rounded-full border border-border-strong bg-surface-solid after:absolute after:-inset-[3px] after:content-['']"
           />
           {NODE_COLORS.map((color) => (
             <button
@@ -204,7 +208,7 @@ export function NodeToolbar({
               aria-label={`颜色 ${color.label}`}
               onClick={() => onColor(color.value)}
               className={cn(
-                "size-5 rounded-full ring-offset-1 transition-transform duration-[var(--dur-1)] hover:scale-110",
+                "relative size-5 rounded-full ring-offset-1 transition-transform duration-[var(--dur-1)] hover:scale-110 after:absolute after:-inset-[3px] after:content-['']",
                 node.node.color === color.value && "ring-2 ring-accent",
               )}
               style={{ backgroundColor: color.value }}

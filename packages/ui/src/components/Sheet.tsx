@@ -127,7 +127,7 @@ export function Sheet({
                 type="button"
                 onClick={close}
                 aria-label="关闭面板"
-                className="-mr-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-ink-500 hover:bg-surface-sunken hover:text-ink-900"
+                className="relative -mr-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-ink-500 after:absolute after:-inset-1.5 after:content-[''] hover:bg-surface-sunken hover:text-ink-900"
               >
                 <X className="size-4" aria-hidden="true" />
               </button>
