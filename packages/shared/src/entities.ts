@@ -128,14 +128,23 @@ export const TaskSchema = z.object({
   notes: z.string().default(""),
   kind: TaskKindSchema.default("task"),
   status: TaskStatusSchema.default("todo"),
+  /** 派生字段：保存时由 posX/posY 推导；筛选、统计、接口仍读它 */
   quadrant: QuadrantSchema.default(2),
-  /** 手工锁定象限后，不再由重要/紧急推导 */
+  /** 兼容旧数据与同步协议的标记；平面不再用它决定象限 */
   manualQuadrant: z.boolean().default(false),
+  /** 旧版 1..5 刻度，保留给日历/捕获等旧入口；四象限改用坐标 */
   importance: z.number().int().min(1).max(5).nullable().default(null),
   urgency: z.number().int().min(1).max(5).nullable().default(null),
-  /** 象限内相对坐标 0..1（0,0 = 左上） */
-  posX: z.number().min(0).max(1).default(0.5),
-  posY: z.number().min(0).max(1).default(0.5),
+  /**
+   * 四象限平面上的归一化坐标，0..1：
+   * - posX = 紧急度（0 最左/不紧急，1 最右/紧急）；
+   * - posY = 纵向位置（0 最上，1 最下），importance = 1 - posY；
+   * - (0.5, 0.5) 是两条轴的原点，象限由坐标符号推导。
+   *
+   * 默认 (0.44, 0.44) 落在 Q2 靠近中心处，新任务不传坐标时不会压在原点上。
+   */
+  posX: z.number().min(0).max(1).default(0.44),
+  posY: z.number().min(0).max(1).default(0.44),
   goalId: z.string().nullable().default(null),
   okrId: z.string().nullable().default(null),
   krId: z.string().nullable().default(null),

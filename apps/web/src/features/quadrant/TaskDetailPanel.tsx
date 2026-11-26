@@ -141,7 +141,7 @@ export function TaskDetailPanel({
       onOpenChange={handleOpenChange}
       side={side}
       title="任务详情"
-      description="双击卡片切换完成；拖动卡片换象限与坐标。"
+      description="拖动平面上的圆点调整位置；双击圆点切换完成。"
       footer={
         <div className="flex items-center gap-2">
           <Button

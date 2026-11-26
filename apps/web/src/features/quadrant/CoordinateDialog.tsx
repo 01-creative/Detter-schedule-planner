@@ -2,17 +2,20 @@ import { useEffect, useState } from "react";
 import type { Task } from "@detter/shared";
 import { QUADRANT_META } from "@detter/shared";
 import { Button, Dialog, cn } from "@detter/ui";
+import { quadrantFromPosition } from "./geometry";
 
 /**
  * 「设置精确坐标…」。
  *
- * 两个 0–100 的滑块 + 数字输入，左边一块同比例的迷你画布做实时预览。
- * 确定之前不写库：拖动滑块只是把 preview 传给板子（自由视图下真卡片会跟着动），
+ * 两个 0–100 的滑块 + 数字输入，左边一块同比例的迷你平面做实时预览。
+ * 这里直接按用户能理解的两条轴命名：横轴紧急度、纵轴重要度；
+ * 存库时再换回 posX / posY（posY = 1 - 重要度）。
+ *
+ * 确定之前不写库：拖动滑块只是把 preview 传给板子（平面上的真圆点会跟着动），
  * Esc / 取消就完全回到原样。
  */
 export interface CoordinateDialogProps {
   task: Task | null;
-  freeMode: boolean;
   onClose: () => void;
   onPreview: (preview: { taskId: string; posX: number; posY: number } | null) => void;
   onConfirm: (task: Task, posX: number, posY: number) => void;
@@ -23,32 +26,29 @@ function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
-export function CoordinateDialog({
-  task,
-  freeMode,
-  onClose,
-  onPreview,
-  onConfirm,
-}: CoordinateDialogProps) {
-  const [x, setX] = useState(50);
-  const [y, setY] = useState(50);
+export function CoordinateDialog({ task, onClose, onPreview, onConfirm }: CoordinateDialogProps) {
+  const [urgency, setUrgency] = useState(50);
+  const [importance, setImportance] = useState(50);
 
   useEffect(() => {
     if (!task) return;
-    setX(clampPercent(task.posX * 100));
-    setY(clampPercent(task.posY * 100));
+    setUrgency(clampPercent(task.posX * 100));
+    setImportance(clampPercent((1 - task.posY) * 100));
   }, [task]);
+
+  const posX = urgency / 100;
+  const posY = 1 - importance / 100;
+  const quadrant = quadrantFromPosition(posX, posY);
 
   /* 实时预览：滑块一动就通知板子；关闭时清掉，绝不留下幽灵位置 */
   useEffect(() => {
     if (!task) return;
-    onPreview({ taskId: task.id, posX: x / 100, posY: y / 100 });
+    onPreview({ taskId: task.id, posX, posY });
     return () => onPreview(null);
-  }, [task, x, y, onPreview]);
+  }, [task, posX, posY, onPreview]);
 
   if (!task) return null;
 
-  const quadrant = task.quadrant;
   const meta = QUADRANT_META[quadrant];
   const tone = `var(--q${quadrant}-accent)`;
 
@@ -59,17 +59,14 @@ export function CoordinateDialog({
         if (!open) onClose();
       }}
       title="设置精确坐标"
-      description="0 靠左上，100 靠右下。坐标是相对于所在象限内部的。"
+      description="横轴：左不紧急、右紧急；纵轴：下不重要、上重要。象限由坐标自动推导。"
       size="sm"
       footer={
         <>
           <Button size="sm" variant="ghost" onClick={onClose}>
             取消
           </Button>
-          <Button
-            size="sm"
-            onClick={() => onConfirm(task, x / 100, y / 100)}
-          >
+          <Button size="sm" onClick={() => onConfirm(task, posX, posY)}>
             保存坐标
           </Button>
         </>
@@ -77,49 +74,51 @@ export function CoordinateDialog({
     >
       <div className="space-y-4">
         <div
-          className="relative h-32 w-full overflow-hidden rounded-lg border border-border"
+          className="relative h-36 w-full overflow-hidden rounded-lg border border-border bg-surface"
           style={{
-            backgroundImage: `linear-gradient(180deg, var(--q${quadrant}-from) 0%, var(--q${quadrant}-to) 100%)`,
+            backgroundImage: [
+              "radial-gradient(70% 70% at 100% 0%, var(--plane-q1, rgba(244,63,94,.14)) 0%, transparent 70%)",
+              "radial-gradient(70% 70% at 0% 0%, var(--plane-q2, rgba(16,185,129,.13)) 0%, transparent 70%)",
+              "radial-gradient(70% 70% at 100% 100%, var(--plane-q3, rgba(245,158,11,.15)) 0%, transparent 70%)",
+              "radial-gradient(70% 70% at 0% 100%, var(--plane-q4, rgba(100,116,139,.12)) 0%, transparent 70%)",
+            ].join(", "),
           }}
           aria-hidden="true"
         >
+          <span className="absolute top-1/2 right-2 left-2 h-px -translate-y-1/2 bg-border-strong" />
+          <span className="absolute top-2 bottom-2 left-1/2 w-px -translate-x-1/2 bg-border-strong" />
+          <div
+            className="absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-2"
+            style={{
+              left: `${urgency}%`,
+              top: `${100 - importance}%`,
+              backgroundColor: tone,
+            }}
+          />
           <div className="absolute inset-x-0 top-0 flex h-7 items-center gap-1.5 px-2 text-micro text-ink-500">
             <span className="size-1.5 rounded-full" style={{ backgroundColor: tone }} />
             Q{quadrant} {meta.name}
-          </div>
-          <div
-            className="absolute h-9 w-2/5 rounded-md border border-white/70 bg-surface-solid shadow-2"
-            style={{
-              left: `${x}%`,
-              top: `${y}%`,
-              transform: `translate(-${x}%, -${y}%)`,
-            }}
-          >
-            <span className="absolute inset-y-1 left-0 w-[3px] rounded-r-full" style={{ backgroundColor: tone }} />
-            <p className="line-clamp-2 px-2 pt-1 text-micro text-ink-700">{task.title}</p>
           </div>
         </div>
 
         <AxisControl
           axis="x"
-          label="X · 水平"
-          value={x}
-          onChange={setX}
-          hint="0 最左，100 最右"
+          label="紧急度 · 横轴"
+          value={urgency}
+          onChange={setUrgency}
+          hint="0 最左（不紧急），100 最右（紧急）"
         />
         <AxisControl
           axis="y"
-          label="Y · 垂直"
-          value={y}
-          onChange={setY}
-          hint="0 最上，100 最下"
+          label="重要度 · 纵轴"
+          value={importance}
+          onChange={setImportance}
+          hint="0 最下（不重要），100 最上（重要）"
         />
 
-        {!freeMode && (
-          <p className="rounded-md bg-info-soft px-2.5 py-2 text-micro text-info-ink">
-            当前是列表视图，坐标会保存；确定后会自动切到自由视图，才能看到位置。
-          </p>
-        )}
+        <p className="rounded-md bg-surface-sunken px-2.5 py-2 text-micro text-ink-500">
+          保存后落在 Q{quadrant} {meta.name}，坐标 {posX.toFixed(2)} / {posY.toFixed(2)}。
+        </p>
       </div>
     </Dialog>
   );

@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type {
-  FocusEvent as ReactFocusEvent,
-  MouseEvent as ReactMouseEvent,
-  PointerEvent as ReactPointerEvent,
-} from "react";
+import type { FocusEvent as ReactFocusEvent, MouseEvent as ReactMouseEvent } from "react";
 import type { Goal, Quadrant, Task } from "@detter/shared";
-import { QUADRANT_META, QUADRANT_ORDER } from "@detter/shared";
-import { cn, useToast } from "@detter/ui";
+import { QUADRANT_META } from "@detter/shared";
+import { useToast } from "@detter/ui";
 import { useUIStore } from "@/stores/ui";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { createTaskFromGoal } from "@/features/goals/goal-actions";
@@ -17,18 +13,17 @@ import { useAllGoals, useBoardTasks } from "./queries";
 import { useIsMobile } from "./useMediaQuery";
 import { computeBoardStats } from "./stats";
 import {
-  insertionIndexForPoint,
   moveQuadrant,
-  nextFreePosition,
-  sortIndexForInsertion,
-  sortTasksForCell,
-  unitFromPoint,
+  nextFreePlanePosition,
+  resolveTaskPoint,
   type MoveDirection,
+  type PlanePoint,
 } from "./geometry";
+import { useCoordinateMigration } from "./coord-migration";
 import { buildCellContextMenu, buildTaskContextMenu, type MenuEntry } from "./menu-model";
-import type { DragPayload, DropTarget, SortMode, ViewMode } from "./types";
+import type { DragPayload, DropTarget } from "./types";
 import { BoardStatsBar } from "./BoardStatsBar";
-import { QuadrantCell } from "./QuadrantCell";
+import { QuadrantPlane } from "./QuadrantPlane";
 import { ContextMenu } from "./ContextMenu";
 import { CoordinateDialog } from "./CoordinateDialog";
 import { TaskDetailPanel } from "./TaskDetailPanel";
@@ -37,6 +32,7 @@ import {
   createTask,
   moveTask,
   patchTask,
+  placeTask,
   removeTask,
   restoreTask,
   setTaskGoal,
@@ -45,28 +41,20 @@ import {
 } from "./task-actions";
 
 /**
- * 四象限画板。
+ * 四象限首页：一张连续的坐标系平面。
  *
- * 这一层只做三件事：把数据按格分好、把交互（新建/拖拽/右键/键盘/撤销）串起来、
- * 把浮层挂上去。视觉细节全在 QuadrantCell / TaskCard / GoalRail 里。
+ * 这一层只做三件事：把数据分好、把交互（新建/拖动/右键/键盘/撤销）串起来、
+ * 把浮层挂上去。视觉与坐标几何分别在 QuadrantPlane / PlaneChrome / geometry 里。
  *
- * 拖拽期间不在 state 里存指针坐标：那部分由 drag-controller 每帧直接改浮层的
- * transform，只有「落点换格子」这种低频变化才 setState。
+ * 关于 quadrant：它仍然写库（筛选/统计/接口都用它），但每次坐标变化都由
+ * task-actions 的 patchTask 重新推导，组件不手动维护第二份事实。
  */
-
-interface InlineState {
-  quadrant: Quadrant;
-  posX: number;
-  posY: number;
-}
 
 interface MenuState {
   x: number;
   y: number;
-  quadrant: Quadrant;
   taskId: string | null;
-  posX: number;
-  posY: number;
+  point: PlanePoint;
 }
 
 function isTyping(target: EventTarget | null): boolean {
@@ -80,38 +68,6 @@ function isTyping(target: EventTarget | null): boolean {
  */
 function eventElement(target: EventTarget | null): Element | null {
   return target instanceof Element ? target : null;
-}
-
-function pointInQuadrant(quadrant: Quadrant, clientX: number, clientY: number) {
-  const cell = document.querySelector<HTMLElement>(`[data-quadrant="${quadrant}"]`);
-  const layer = cell?.querySelector<HTMLElement>("[data-quadrant-layer]");
-  const box = (layer ?? cell)?.getBoundingClientRect();
-  if (!box) return { posX: 0.5, posY: 0.2 };
-  return unitFromPoint(clientX, clientY, {
-    left: box.left,
-    top: box.top,
-    width: box.width,
-    height: box.height,
-  });
-}
-
-/** 列表模式的落点：量一遍目标格里每张卡的竖直中线，算出插到第几个。 */
-function measureInsertIndex(quadrant: Quadrant, target: DropTarget, draggedId: string): number {
-  const cell = document.querySelector<HTMLElement>(`[data-quadrant="${quadrant}"]`);
-  if (!cell) return 0;
-  const nodes = Array.from(cell.querySelectorAll<HTMLElement>("[data-task-id]")).filter(
-    (node) => node.getAttribute("data-task-id") !== draggedId,
-  );
-  const boundaries = nodes.map((node) => {
-    const rect = node.getBoundingClientRect();
-    return {
-      id: node.getAttribute("data-task-id") ?? "",
-      top: rect.top,
-      height: rect.height,
-    };
-  });
-  const y = target.rect.top + target.posY * target.rect.height;
-  return insertionIndexForPoint(boundaries, y);
 }
 
 function fallbackCopy(text: string): boolean {
@@ -133,20 +89,10 @@ function fallbackCopy(text: string): boolean {
 export function QuadrantBoard() {
   const { data: tasks, loading } = useBoardTasks();
   const goals = useAllGoals();
-  const {
-    viewMode,
-    setViewMode,
-    sortMode,
-    setSortMode,
-    draggingKind,
-    draggingTaskId,
-    overQuadrant,
-    startTaskDrag,
-    isClickSuppressed,
-    setDropHandlers,
-  } = useQuadrantDrag();
+  const { draggingKind, overQuadrant, isClickSuppressed, setDropHandlers } = useQuadrantDrag();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { ready: coordsReady } = useCoordinateMigration();
 
   const goalRailCollapsed = useUIStore((state) => state.goalRailCollapsed);
   const toggleGoalRail = useUIStore((state) => state.toggleGoalRailCollapsed);
@@ -154,37 +100,27 @@ export function QuadrantBoard() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [inline, setInline] = useState<InlineState | null>(null);
+  const [inline, setInline] = useState<PlanePoint | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [coordId, setCoordId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ taskId: string; posX: number; posY: number } | null>(null);
+  const [preview, setPreview] = useState<{ taskId: string; posX: number; posY: number } | null>(
+    null,
+  );
   const [undo, setUndo] = useState<UndoState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
-  const [mobileFilter, setMobileFilter] = useState<0 | Quadrant>(0);
 
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
-  const inlineRef = useRef<InlineState | null>(inline);
-  inlineRef.current = inline;
   const goalsByIdRef = useRef<Map<string, Goal>>(new Map());
   const pendingClick = useRef<{ id: string; timer: number } | null>(null);
   const undoTimer = useRef<number | null>(null);
-  const undoTaskRef = useRef<Task | null>(null);
+  const undoActionRef = useRef<(() => Promise<void>) | null>(null);
 
   const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
   const goalsById = useMemo(() => new Map(goals.map((goal) => [goal.id, goal])), [goals]);
   goalsByIdRef.current = goalsById;
 
   const stats = useMemo(() => computeBoardStats(tasks), [tasks]);
-  const byQuadrant = useMemo(() => {
-    const now = Date.now();
-    const map: Record<Quadrant, Task[]> = { 1: [], 2: [], 3: [], 4: [] };
-    for (const task of tasks) map[task.quadrant].push(task);
-    for (const quadrant of QUADRANT_ORDER) {
-      map[quadrant] = sortTasksForCell(map[quadrant], sortMode, now);
-    }
-    return map;
-  }, [tasks, sortMode]);
 
   const detailTask = detailId ? (tasksById.get(detailId) ?? null) : null;
   const coordTask = coordId ? (tasksById.get(coordId) ?? null) : null;
@@ -211,10 +147,17 @@ export function QuadrantBoard() {
     [],
   );
 
+  const clearPendingClick = useCallback(() => {
+    if (pendingClick.current) {
+      window.clearTimeout(pendingClick.current.timer);
+      pendingClick.current = null;
+    }
+  }, []);
+
   const focusTask = useCallback((id: string) => {
     window.setTimeout(() => {
       document
-        .querySelector<HTMLElement>(`[data-task-id="${id}"]`)
+        .querySelector<HTMLElement>(`[data-plane-task="${id}"]`)
         ?.focus({ preventScroll: true });
     }, 80);
   }, []);
@@ -227,21 +170,19 @@ export function QuadrantBoard() {
 
   /**
    * 单击打开详情，但要让位给双击完成：
-   * 第一下先挂起 220ms，若第二下落在同一张卡上就取消打开（交给 dblclick 切换完成）。
-   * 点了另一张卡则立刻把上一张打开，不会「什么都没发生」。
+   * 第一下先挂起 220ms，若第二下落在同一个圆点上就取消打开（交给 dblclick 切换完成）。
+   * 点了另一个圆点则立刻把上一个打开，不会「什么都没发生」。
    */
   const handleOpen = useCallback(
     (task: Task) => {
       if (isClickSuppressed()) return;
       const pending = pendingClick.current;
       if (pending && pending.id === task.id) {
-        window.clearTimeout(pending.timer);
-        pendingClick.current = null;
+        clearPendingClick();
         return;
       }
       if (pending) {
-        window.clearTimeout(pending.timer);
-        pendingClick.current = null;
+        clearPendingClick();
         openDetailNow(pending.id);
       }
       const timer = window.setTimeout(() => {
@@ -250,47 +191,29 @@ export function QuadrantBoard() {
       }, 220);
       pendingClick.current = { id: task.id, timer };
     },
-    [isClickSuppressed, openDetailNow],
+    [clearPendingClick, isClickSuppressed, openDetailNow],
   );
 
   const handleToggleDone = useCallback(
     (task: Task) => {
       if (isClickSuppressed()) return;
-      const pending = pendingClick.current;
-      if (pending && pending.id === task.id) {
-        window.clearTimeout(pending.timer);
-        pendingClick.current = null;
-      }
+      clearPendingClick();
       void toggleTaskDone(task);
     },
-    [isClickSuppressed],
+    [clearPendingClick, isClickSuppressed],
   );
 
-  const handleMoveTo = useCallback(
-    async (task: Task, quadrant: Quadrant) => {
-      if (task.quadrant === quadrant) return;
-      await moveTask(task, quadrant);
-      toast({
-        title: `已移到 Q${quadrant}`,
-        description: QUADRANT_META[quadrant].name,
-      });
-      focusTask(task.id);
-    },
-    [focusTask, toast],
-  );
+  /* ------------------------------- 撤销条 -------------------------------- */
 
-  /* ------------------------------- 删除 / 撤销 ----------------------------- */
-
-  const deleteWithUndo = useCallback(async (task: Task) => {
+  const showUndo = useCallback((state: Omit<UndoState, "expiresAt">, action: () => Promise<void>) => {
     if (undoTimer.current) window.clearTimeout(undoTimer.current);
-    undoTaskRef.current = task;
-    setUndo({ title: task.title, expiresAt: Date.now() + 5000 });
+    undoActionRef.current = action;
+    setUndo({ ...state, expiresAt: Date.now() + 5000 });
     undoTimer.current = window.setTimeout(() => {
       undoTimer.current = null;
-      undoTaskRef.current = null;
+      undoActionRef.current = null;
       setUndo(null);
     }, 5000);
-    await removeTask(task);
   }, []);
 
   const handleUndo = useCallback(async () => {
@@ -298,87 +221,128 @@ export function QuadrantBoard() {
       window.clearTimeout(undoTimer.current);
       undoTimer.current = null;
     }
-    const task = undoTaskRef.current;
-    undoTaskRef.current = null;
+    const action = undoActionRef.current;
+    undoActionRef.current = null;
     setUndo(null);
-    if (!task) return;
-    await restoreTask(task);
-    toast({ title: "已撤销删除", description: task.title, tone: "success" });
-    focusTask(task.id);
-  }, [focusTask, toast]);
+    if (!action) return;
+    try {
+      await action();
+      toast({ title: "已撤销", tone: "success" });
+    } catch {
+      toast({ title: "撤销失败", description: "请刷新后再试", tone: "danger" });
+    }
+  }, [toast]);
 
   const dismissUndo = useCallback(() => {
     if (undoTimer.current) window.clearTimeout(undoTimer.current);
     undoTimer.current = null;
-    undoTaskRef.current = null;
+    undoActionRef.current = null;
     setUndo(null);
   }, []);
 
-  /* --------------------------------- 新建 --------------------------------- */
-
-  const openInline = useCallback(
-    (quadrant: Quadrant, position?: { posX: number; posY: number }) => {
-      const existing = tasksRef.current.filter((task) => task.quadrant === quadrant);
-      const fallback = nextFreePosition(existing);
-      setInline({
-        quadrant,
-        posX: position?.posX ?? fallback.posX,
-        posY: position?.posY ?? fallback.posY,
+  const rememberMove = useCallback(
+    (
+      task: Task,
+      before: Pick<Task, "posX" | "posY" | "quadrant">,
+      message: string,
+    ) => {
+      showUndo({ title: task.title, kind: "move", message }, async () => {
+        const current = tasksRef.current.find((entry) => entry.id === task.id);
+        if (!current) return;
+        await patchTask(current, {
+          posX: before.posX,
+          posY: before.posY,
+          quadrant: before.quadrant,
+        });
+        focusTask(task.id);
       });
     },
-    [],
+    [focusTask, showUndo],
+  );
+
+  /* ------------------------------- 删除 / 撤销 ----------------------------- */
+
+  const deleteWithUndo = useCallback(
+    async (task: Task) => {
+      showUndo(
+        {
+          title: task.title,
+          kind: "delete",
+          message: `已删除「${task.title}」`,
+        },
+        async () => {
+          await restoreTask(task);
+          focusTask(task.id);
+        },
+      );
+      await removeTask(task);
+    },
+    [focusTask, showUndo],
+  );
+
+  /* --------------------------------- 新建 --------------------------------- */
+
+  const allPoints = useMemo(() => tasks.map((task) => resolveTaskPoint(task)), [tasks]);
+
+  const openInline = useCallback(
+    (point?: PlanePoint) => {
+      setInline(
+        point ? { x: point.x, y: point.y } : nextFreePlanePosition(allPoints),
+      );
+    },
+    [allPoints],
   );
 
   const submitInline = useCallback(
     async (title: string) => {
-      const composer = inlineRef.current;
+      const composer = inline;
       if (!composer) return;
       const task = await createTask({
         title,
-        quadrant: composer.quadrant,
-        posX: composer.posX,
-        posY: composer.posY,
+        posX: composer.x,
+        posY: composer.y,
         source: "manual",
       });
       setInline(null);
       setSelectedId(task.id);
       focusTask(task.id);
     },
-    [focusTask],
+    [focusTask, inline],
   );
 
   const cancelInline = useCallback(() => setInline(null), []);
 
   /* ------------------------------- 右键菜单 ------------------------------- */
 
-  const handleTaskContextMenu = useCallback((task: Task, event: ReactMouseEvent) => {
-    setMenu({
-      x: event.clientX,
-      y: event.clientY,
-      quadrant: task.quadrant,
-      taskId: task.id,
-      posX: task.posX,
-      posY: task.posY,
-    });
-  }, []);
-
-  const handleCellContextMenu = useCallback((quadrant: Quadrant, event: ReactMouseEvent) => {
+  const handleTaskContextMenu = useCallback((task: Task, event: ReactMouseEvent<HTMLElement>) => {
     event.preventDefault();
-    const point = pointInQuadrant(quadrant, event.clientX, event.clientY);
     setMenu({
       x: event.clientX,
       y: event.clientY,
-      quadrant,
-      taskId: null,
-      posX: point.posX,
-      posY: point.posY,
+      taskId: task.id,
+      point: resolveTaskPoint(task),
     });
   }, []);
 
-  const handleCellDoubleClick = useCallback(
-    (quadrant: Quadrant, event: ReactMouseEvent) => {
-      const point = pointInQuadrant(quadrant, event.clientX, event.clientY);
-      openInline(quadrant, point);
+  const handleLongPress = useCallback((task: Task, x: number, y: number) => {
+    setMenu({ x, y, taskId: task.id, point: resolveTaskPoint(task) });
+  }, []);
+
+  const handleBlankContextMenu = useCallback(
+    (point: PlanePoint, event: ReactMouseEvent<HTMLElement>) => {
+      setMenu({
+        x: event.clientX,
+        y: event.clientY,
+        taskId: null,
+        point,
+      });
+    },
+    [],
+  );
+
+  const handleBlankDoubleClick = useCallback(
+    (point: PlanePoint) => {
+      openInline(point);
     },
     [openInline],
   );
@@ -387,7 +351,11 @@ export function QuadrantBoard() {
     if (!menu) return [];
     const task = menu.taskId ? tasksById.get(menu.taskId) : undefined;
     if (!task) return buildCellContextMenu();
-    return buildTaskContextMenu({ task, goals, quadrant: task.quadrant });
+    return buildTaskContextMenu({
+      task,
+      goals,
+      quadrant: task.quadrant,
+    });
   }, [menu, tasksById, goals]);
 
   const copyTitle = useCallback(
@@ -403,21 +371,34 @@ export function QuadrantBoard() {
     [toast],
   );
 
+  const handleMoveTo = useCallback(
+    async (task: Task, quadrant: Quadrant) => {
+      if (task.quadrant === quadrant) return;
+      const before = { posX: task.posX, posY: task.posY, quadrant: task.quadrant };
+      const updated = await moveTask(task, quadrant);
+      rememberMove(
+        updated,
+        before,
+        `已移到 Q${quadrant} ${QUADRANT_META[quadrant].name}`,
+      );
+      focusTask(task.id);
+    },
+    [focusTask, rememberMove],
+  );
+
   const handleMenuSelect = useCallback(
     (key: string) => {
       const current = menu;
       const task = current?.taskId ? tasksById.get(current.taskId) : undefined;
 
       if (key === "new") {
-        openInline(
-          current?.quadrant ?? 2,
-          task ? undefined : { posX: current?.posX ?? 0.5, posY: current?.posY ?? 0.2 },
-        );
+        openInline(current?.point);
         return;
       }
       if (!task) return;
 
       if (key === "toggle-done") {
+        clearPendingClick();
         void toggleTaskDone(task);
         return;
       }
@@ -456,27 +437,46 @@ export function QuadrantBoard() {
       }
       if (key === "delete") {
         if (detailId === task.id) setDetailId(null);
+        clearPendingClick();
         void deleteWithUndo(task);
       }
     },
-    [copyTitle, deleteWithUndo, detailId, handleMoveTo, menu, openInline, tasksById, toast],
+    [
+      clearPendingClick,
+      copyTitle,
+      deleteWithUndo,
+      detailId,
+      handleMoveTo,
+      menu,
+      openInline,
+      tasksById,
+      toast,
+    ],
   );
 
   /* --------------------------------- 拖拽 --------------------------------- */
 
-  const handleStartDrag = useCallback(
-    (task: Task, event: ReactPointerEvent<HTMLElement>) => {
-      const goal = task.goalId ? (goalsByIdRef.current.get(task.goalId) ?? null) : null;
+  const handleMoveTask = useCallback(
+    async (task: Task, point: PlanePoint) => {
+      const before = { posX: task.posX, posY: task.posY, quadrant: task.quadrant };
+      if (Math.abs(before.posX - point.x) < 0.001 && Math.abs(before.posY - point.y) < 0.001) {
+        return;
+      }
+      const updated = await placeTask(task, point.x, point.y);
+      rememberMove(updated, before, `已移动「${task.title}」`);
       setSelectedId(task.id);
-      startTaskDrag(task, goal, event);
     },
-    [startTaskDrag],
+    [rememberMove],
   );
 
   const handleDrop = useCallback(
     async (payload: DragPayload, target: DropTarget) => {
       if (payload.kind === "goal") {
-        const created = await createTaskFromGoal(payload.goal, target);
+        const created = await createTaskFromGoal(payload.goal, {
+          quadrant: target.quadrant,
+          posX: target.posX,
+          posY: target.posY,
+        });
         toast({
           title: "已把目标变成任务",
           description: `${payload.goal.title} · Q${target.quadrant}`,
@@ -484,33 +484,9 @@ export function QuadrantBoard() {
         });
         setSelectedId(created.id);
         focusTask(created.id);
-        return;
-      }
-
-      const { task } = payload;
-      if (viewMode === "free") {
-        await moveTask(task, target.quadrant, { posX: target.posX, posY: target.posY });
-        return;
-      }
-
-      const index = measureInsertIndex(target.quadrant, target, task.id);
-      const others = sortTasksForCell(
-        tasksRef.current.filter(
-          (item) => item.quadrant === target.quadrant && item.id !== task.id,
-        ),
-        sortMode,
-        Date.now(),
-      );
-      const sortIndex = sortIndexForInsertion(others, index);
-      await moveTask(task, target.quadrant, { sortIndex });
-      if (task.quadrant !== target.quadrant) {
-        toast({
-          title: `已移到 Q${target.quadrant}`,
-          description: QUADRANT_META[target.quadrant].name,
-        });
       }
     },
-    [focusTask, sortMode, toast, viewMode],
+    [focusTask, toast],
   );
 
   useEffect(() => {
@@ -538,7 +514,7 @@ export function QuadrantBoard() {
       if (isTyping(event.target)) return;
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
-        if (!undoTaskRef.current) return;
+        if (!undoActionRef.current) return;
         event.preventDefault();
         void handleUndo();
         return;
@@ -576,12 +552,9 @@ export function QuadrantBoard() {
   }, [deleteWithUndo, handleMoveTo, handleUndo, inline, menu, selectedId, tasksById]);
 
   const handleFocusCapture = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
-    const id = eventElement(event.target)?.closest("[data-task-id]")?.getAttribute("data-task-id");
-    if (id) setSelectedId(id);
-  }, []);
-
-  const handlePointerDownCapture = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const id = eventElement(event.target)?.closest("[data-task-id]")?.getAttribute("data-task-id");
+    const id = eventElement(event.target)
+      ?.closest("[data-plane-task]")
+      ?.getAttribute("data-plane-task");
     if (id) setSelectedId(id);
   }, []);
 
@@ -592,120 +565,49 @@ export function QuadrantBoard() {
       setPreview(null);
       await setTaskPosition(task, posX, posY);
       setCoordId(null);
-      if (viewMode === "list") {
-        setViewMode("free");
-        toast({
-          title: "已切到自由视图",
-          description: "坐标已保存，卡片按坐标摆放",
-        });
-      }
       focusTask(task.id);
     },
-    [focusTask, setViewMode, toast, viewMode],
+    [focusTask],
   );
 
   const openGoalRail = useCallback(() => setGoalRailDrawerOpen(true), [setGoalRailDrawerOpen]);
 
-  const visibleQuadrants: Quadrant[] =
-    isMobile && mobileFilter !== 0 ? [mobileFilter] : QUADRANT_ORDER;
-
-  const openCount = (quadrant: Quadrant) =>
-    byQuadrant[quadrant].filter((task) => task.status !== "done" && task.status !== "dropped").length;
-
-  if (loading) return <BoardSkeleton />;
+  if (loading || !coordsReady) return <BoardSkeleton />;
 
   return (
     <div
       className="flex min-h-0 min-w-0 flex-1 flex-col"
       onFocusCapture={handleFocusCapture}
-      onPointerDownCapture={handlePointerDownCapture}
     >
       <BoardStatsBar
         stats={stats}
-        viewMode={viewMode}
-        onViewModeChange={(mode: ViewMode) => setViewMode(mode)}
-        sortMode={sortMode}
-        onSortModeChange={(mode: SortMode) => setSortMode(mode)}
+        onNewTask={() => openInline()}
         onOpenGoalRail={openGoalRail}
         onToggleGoalRail={toggleGoalRail}
         goalRailCollapsed={goalRailCollapsed}
       />
 
-      {/* 移动端：Q1–Q4 + 全部，吸在主标题栏下方；按钮自身可压缩，不裁切。
-          横向滚动放在 nav 上而不是里面那层：里面的圆角胶囊只有 36 高，
-          一旦它自己 overflow-x:auto，分段按钮补出来的 44 命中区会被裁回 36。
-          一条任务都没有时整条不渲染：5 个分段全是「0」，只是占掉首屏 44px。 */}
-      {stats.open > 0 && (
-        <nav
-          aria-label="象限筛选"
-          className="no-scrollbar sticky top-[52px] z-20 -mx-4 mt-3 overflow-x-auto border-b border-border bg-bg/95 px-4 py-2 backdrop-blur md:hidden"
-        >
-          <div className="flex items-center gap-1 rounded-full bg-surface-sunken/80 p-1">
-            {([0, ...QUADRANT_ORDER] as const).map((value) => {
-              const active = mobileFilter === value;
-              const count = value === 0 ? stats.open : openCount(value);
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setMobileFilter(value)}
-                  className={cn(
-                    "relative flex h-7 min-w-0 flex-1 basis-0 items-center justify-center gap-1 rounded-full px-1 text-caption whitespace-nowrap transition-colors duration-[var(--dur-1)]",
-                    // 分段控件视觉 28 高，命中区补到 44：上下各借 8px（落在 nav 的 py-2 里），
-                    // 左右各借 2px 正好吃掉 gap-1 的一半，不与相邻分段重叠。
-                    "after:absolute after:-inset-y-2 after:-inset-x-0.5 after:content-['']",
-                    active
-                      ? "bg-surface-solid text-ink-900 shadow-1"
-                      : "text-ink-500 hover:text-ink-700",
-                  )}
-                >
-                  {value !== 0 && (
-                    <span
-                      aria-hidden="true"
-                      className="size-1.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: `var(--q${value}-accent)` }}
-                    />
-                  )}
-                  {value === 0 ? "全部" : `Q${value}`}
-                  <span className="tabular text-micro text-ink-300">{count}</span>
-                </button>
-              );
-            })}
-          </div>
-        </nav>
-      )}
-
-      {/* 移动端格间距 12 → 8：四格纵向堆叠时这一项直接决定「一屏能看见几个象限」 */}
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-2 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:grid-cols-2 md:grid-rows-2 md:gap-4 md:pb-0">
-        {visibleQuadrants.map((quadrant) => (
-          <QuadrantCell
-            key={quadrant}
-            quadrant={quadrant}
-            tasks={byQuadrant[quadrant]}
-            viewMode={viewMode}
-            goalsById={goalsById}
-            selectedId={selectedId}
-            draggingTaskId={draggingTaskId}
-            overQuadrant={overQuadrant}
-            goalDragActive={draggingKind === "goal"}
-            composer={
-              inline && inline.quadrant === quadrant
-                ? { posX: inline.posX, posY: inline.posY }
-                : null
-            }
-            preview={preview}
-            onOpen={handleOpen}
-            onToggleDone={handleToggleDone}
-            onContextMenu={handleTaskContextMenu}
-            onStartDrag={handleStartDrag}
-            onCellContextMenu={handleCellContextMenu}
-            onCellDoubleClick={handleCellDoubleClick}
-            onAdd={openInline}
-            onComposerSubmit={submitInline}
-            onComposerCancel={cancelInline}
-          />
-        ))}
+      <div className="mt-3 flex min-h-0 flex-1 flex-col">
+        <QuadrantPlane
+          tasks={tasks}
+          goalsById={goalsById}
+          stats={stats}
+          selectedId={selectedId}
+          overQuadrant={overQuadrant}
+          goalDragActive={draggingKind === "goal"}
+          composer={inline}
+          preview={preview}
+          onSelect={setSelectedId}
+          onOpen={handleOpen}
+          onToggleDone={handleToggleDone}
+          onContextMenu={handleTaskContextMenu}
+          onLongPress={handleLongPress}
+          onBlankContextMenu={handleBlankContextMenu}
+          onBlankDoubleClick={handleBlankDoubleClick}
+          onMoveTask={handleMoveTask}
+          onComposerSubmit={submitInline}
+          onComposerCancel={cancelInline}
+        />
       </div>
 
       <ContextMenu
@@ -713,14 +615,13 @@ export function QuadrantBoard() {
         x={menu?.x ?? 0}
         y={menu?.y ?? 0}
         items={menuItems}
-        label={menu?.taskId ? "任务操作" : "象限操作"}
+        label={menu?.taskId ? "任务操作" : "平面操作"}
         onSelect={handleMenuSelect}
         onClose={() => setMenu(null)}
       />
 
       <CoordinateDialog
         task={coordTask}
-        freeMode={viewMode === "free"}
         onClose={() => {
           setCoordId(null);
           setPreview(null);
@@ -758,7 +659,7 @@ export function QuadrantBoard() {
         title="删除这条任务？"
         description={
           deleteTarget
-            ? `「${deleteTarget.title}」会被移出四象限，5 秒内可以撤销。`
+            ? `「${deleteTarget.title}」会从平面上消失，5 秒内可以撤销。`
             : undefined
         }
         confirmLabel="删除"
@@ -776,19 +677,12 @@ export function QuadrantBoard() {
 
 function BoardSkeleton() {
   return (
-    <div className="flex min-h-0 flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-3">
         <div className="h-5 w-24 animate-pulse rounded bg-surface-sunken" />
         <div className="h-3 w-40 animate-pulse rounded bg-surface-sunken" />
       </div>
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2 md:grid-rows-2 md:gap-4">
-        {QUADRANT_ORDER.map((quadrant) => (
-          <div
-            key={quadrant}
-            className="min-h-[220px] animate-pulse rounded-2xl border border-border bg-surface"
-          />
-        ))}
-      </div>
+      <div className="mt-3 h-[560px] animate-pulse rounded-3xl border border-border bg-surface md:h-auto md:flex-1" />
     </div>
   );
 }

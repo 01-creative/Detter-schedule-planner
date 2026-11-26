@@ -1,16 +1,20 @@
 import { motion, useReducedMotion } from "motion/react";
-import { Trash2, Undo2, X } from "lucide-react";
+import { Move, Trash2, Undo2, X } from "lucide-react";
 
 /**
- * 删除后的 5 秒撤销条。
+ * 删除 / 移动后的 5 秒撤销条。
  *
- * 为什么不用普通 toast：删除是这里唯一会「让东西消失」的动作，
- * 光提示「已删除」没有用，用户需要的是**立刻能反悔**。
+ * 为什么不用普通 toast：删除和「拖完松手」都是会改变数据状态的动作，
+ * 光提示「已完成」没有用，用户需要的是**立刻能反悔**。
  * 所以它带一个真正可点的「撤销」，并在 5 秒后自动收走。
+ *
+ * 移动复用同一条：`kind` 只换图标，文案由调用方给。
  */
 export interface UndoState {
   title: string;
   expiresAt: number;
+  kind?: "delete" | "move";
+  message?: string;
 }
 
 export interface UndoBarProps {
@@ -30,9 +34,13 @@ export function UndoBar({ undo, onUndo, onDismiss }: UndoBarProps) {
       className="pointer-events-none fixed inset-x-0 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] z-[62] flex justify-center px-4 md:bottom-6"
     >
       <div className="pointer-events-auto relative flex w-full max-w-md items-center gap-2.5 overflow-hidden rounded-lg border border-border bg-surface-solid px-3 py-2 shadow-3">
-        <Trash2 className="size-4 shrink-0 text-ink-300" aria-hidden="true" />
+        {undo.kind === "move" ? (
+          <Move className="size-4 shrink-0 text-ink-300" aria-hidden="true" />
+        ) : (
+          <Trash2 className="size-4 shrink-0 text-ink-300" aria-hidden="true" />
+        )}
         <p className="min-w-0 flex-1 truncate text-caption text-ink-700">
-          已删除「{undo.title}」
+          {undo.message ?? `已删除「${undo.title}」`}
         </p>
         <button
           type="button"

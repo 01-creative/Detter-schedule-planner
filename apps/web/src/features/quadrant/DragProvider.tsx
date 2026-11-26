@@ -9,38 +9,28 @@ import {
   useState,
 } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import type { Goal, Quadrant, Task } from "@detter/shared";
-import { TaskCard } from "@/components/common/TaskCard";
+import type { Goal, Quadrant } from "@detter/shared";
 import { createDragController } from "./drag-controller";
-import { useBoardSetting } from "./useBoardSetting";
-import type { DragPayload, DragSnapshot, DropHandlers, SortMode, ViewMode } from "./types";
+import type { DragSnapshot, DropHandlers } from "./types";
 
 /**
- * 四象限的拖拽 + 板级设置上下文。
+ * 四象限的拖拽上下文（只负责「从目标栏拖一条目标到平面上」）。
  *
- * 目标栏也要能「把目标拖到象限」，而板子和目标栏是两个兄弟组件，
- * 所以拖拽引擎、视图模式、目标落点回调都放在这一层，页面只负责把它们包起来。
+ * 任务圆点的拖动是平面自己的指针逻辑（需要实时坐标读数与松手才落库），
+ * 不走这套浮层；但目标栏和平面是两个兄弟组件，所以把引擎放在这里共享。
  */
 
 interface QuadrantDragValue {
-  viewMode: ViewMode;
-  setViewMode: (mode: ViewMode) => void;
-  sortMode: SortMode;
-  setSortMode: (mode: SortMode) => void;
-
-  /** 当前拖的是任务还是目标（决定格子的高亮样式） */
+  /** 当前拖的是任务还是目标（决定平面的高亮样式） */
   draggingKind: "task" | "goal" | null;
   draggingTaskId: string | null;
   draggingGoalId: string | null;
   /** 指针当前悬停的象限 */
   overQuadrant: Quadrant | null;
 
-  startTaskDrag: (task: Task, goal: Goal | null, event: ReactPointerEvent<HTMLElement>) => void;
   startGoalDrag: (goal: Goal, event: ReactPointerEvent<HTMLElement>) => void;
   /** 拖拽刚结束时用来吞掉一次 click */
   isClickSuppressed: () => boolean;
-  /** 浮层首次出现时把位置对齐到指针（之后由 rAF 接管） */
-  applyOverlay: () => void;
 
   setDropHandlers: (handlers: DropHandlers) => void;
 }
@@ -54,19 +44,16 @@ export function useQuadrantDrag(): QuadrantDragValue {
 }
 
 export function QuadrantProvider({ children }: { children: ReactNode }) {
-  const [viewMode, setViewMode] = useBoardSetting<ViewMode>("quadrant.viewMode", "list");
-  const [sortMode, setSortMode] = useBoardSetting<SortMode>("quadrant.sortMode", "smart");
   const [drag, setDrag] = useState<DragSnapshot | null>(null);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const handlersRef = useRef<DropHandlers>({});
-  const viewModeRef = useRef(viewMode);
-  viewModeRef.current = viewMode;
 
   const [controller] = useState(() =>
     createDragController({
       getOverlay: () => overlayRef.current,
-      isFreeMode: () => viewModeRef.current === "free",
+      // 平面没有「列表/自由」两种落点语义，浮层永远投影到目标坐标
+      isFreeMode: () => true,
       onDrop: (payload, target) => {
         void handlersRef.current.drop?.(payload, target);
       },
@@ -85,13 +72,6 @@ export function QuadrantProvider({ children }: { children: ReactNode }) {
     handlersRef.current = handlers;
   }, []);
 
-  const startTaskDrag = useCallback(
-    (task: Task, goal: Goal | null, event: ReactPointerEvent<HTMLElement>) => {
-      controller.start({ kind: "task", task, goal }, event);
-    },
-    [controller],
-  );
-
   const startGoalDrag = useCallback(
     (goal: Goal, event: ReactPointerEvent<HTMLElement>) => {
       controller.start({ kind: "goal", goal }, event);
@@ -103,32 +83,15 @@ export function QuadrantProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<QuadrantDragValue>(
     () => ({
-      viewMode,
-      setViewMode,
-      sortMode,
-      setSortMode,
       draggingKind: drag?.payload.kind ?? null,
       draggingTaskId: drag?.payload.kind === "task" ? drag.payload.task.id : null,
       draggingGoalId: drag?.payload.kind === "goal" ? drag.payload.goal.id : null,
       overQuadrant: drag?.overQuadrant ?? null,
-      startTaskDrag,
       startGoalDrag,
       isClickSuppressed,
-      applyOverlay: controller.applyOverlay,
       setDropHandlers,
     }),
-    [
-      viewMode,
-      setViewMode,
-      sortMode,
-      setSortMode,
-      drag,
-      startTaskDrag,
-      startGoalDrag,
-      isClickSuppressed,
-      controller,
-      setDropHandlers,
-    ],
+    [drag, startGoalDrag, isClickSuppressed, setDropHandlers],
   );
 
   return (
@@ -144,9 +107,6 @@ export function QuadrantProvider({ children }: { children: ReactNode }) {
           opacity: drag ? 1 : 0,
         }}
       >
-        {drag?.payload.kind === "task" && (
-          <TaskCard task={drag.payload.task} goal={drag.payload.goal} dragging />
-        )}
         {drag?.payload.kind === "goal" && (
           <div className="flex rotate-[.4deg] items-center gap-2 rounded-lg border border-accent/30 bg-surface-solid px-3 py-2.5 shadow-3">
             <span

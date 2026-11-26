@@ -52,3 +52,6 @@ data/
 # QA artifacts
 .qa/
 .tmp-*/
+
+# 本机单端口实例的数据库
+.local/

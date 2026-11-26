@@ -1,18 +1,16 @@
-/* Detter 应用层样式：只放 Tailwind 入口、内容扫描路径与「应用才有」的组合样式。 */
+﻿/* Detter 搴旂敤灞傛牱寮忥細鍙斁 Tailwind 鍏ュ彛銆佸唴瀹规壂鎻忚矾寰勪笌銆屽簲鐢ㄦ墠鏈夈€嶇殑缁勫悎鏍峰紡銆?*/
 
-/* Tailwind v4 没有 tailwind.config.js：@theme 令牌与工具类都由 CSS 驱动。
-   设计令牌在 packages/ui/src/styles/tokens.css，这里必须用 @import 引入，
-   因为 @theme 与工具类要在同一次编译里合并，分开 import 会拿不到自定义颜色。 */
+/* Tailwind v4 娌℃湁 tailwind.config.js锛欯theme 浠ょ墝涓庡伐鍏风被閮界敱 CSS 椹卞姩銆?   璁捐浠ょ墝鍦?packages/ui/src/styles/tokens.css锛岃繖閲屽繀椤荤敤 @import 寮曞叆锛?   鍥犱负 @theme 涓庡伐鍏风被瑕佸湪鍚屼竴娆＄紪璇戦噷鍚堝苟锛屽垎寮€ import 浼氭嬁涓嶅埌鑷畾涔夐鑹层€?*/
 @import "tailwindcss";
 @import "../../../../packages/ui/src/styles/tokens.css";
 
-/* Tailwind v4 默认只扫描 CSS 所在项目（apps/web），
-   工作区里的 packages/ui 与 src 都要显式登记，否则组件类名会被裁掉。 */
+/* Tailwind v4 榛樿鍙壂鎻?CSS 鎵€鍦ㄩ」鐩紙apps/web锛夛紝
+   宸ヤ綔鍖洪噷鐨?packages/ui 涓?src 閮借鏄惧紡鐧昏锛屽惁鍒欑粍浠剁被鍚嶄細琚鎺夈€?*/
 @source "../../../../packages/ui/src";
 @source "../../src";
 
 @layer base {
-  /* 移动端底部有 tab bar，用 dvh 而不是 vh，避免浏览器地址栏收起时出现跳动 */
+  /* 绉诲姩绔簳閮ㄦ湁 tab bar锛岀敤 dvh 鑰屼笉鏄?vh锛岄伩鍏嶆祻瑙堝櫒鍦板潃鏍忔敹璧锋椂鍑虹幇璺冲姩 */
   html,
   body,
   #root {
@@ -20,13 +18,13 @@
   }
 
   body {
-    /* 光斑是固定的背景层，不随页面滚动 */
+    /* 鍏夋枒鏄浐瀹氱殑鑳屾櫙灞傦紝涓嶉殢椤甸潰婊氬姩 */
     background-image: var(--bg-tint-1), var(--bg-tint-2);
     background-attachment: fixed;
     background-repeat: no-repeat;
   }
 
-  /* 桌面端滚动条出现/消失不该让内容左右跳 */
+  /* 妗岄潰绔粴鍔ㄦ潯鍑虹幇/娑堝け涓嶈璁╁唴瀹瑰乏鍙宠烦 */
   html {
     scrollbar-gutter: stable;
   }
@@ -39,58 +37,587 @@
 }
 
 @layer components {
-  /* 象限格：底色来自 data-q，深浅色各自一套渐变 */
-  .quadrant-cell {
-    --cell-from: transparent;
-    --cell-to: transparent;
-    background-image: linear-gradient(180deg, var(--cell-from) 0%, var(--cell-to) 100%);
-  }
-
-  .quadrant-cell[data-q="1"] {
-    --cell-from: var(--q1-from);
-    --cell-to: var(--q1-to);
-  }
-
-  .quadrant-cell[data-q="2"] {
-    --cell-from: var(--q2-from);
-    --cell-to: var(--q2-to);
-  }
-
-  .quadrant-cell[data-q="3"] {
-    --cell-from: var(--q3-from);
-    --cell-to: var(--q3-to);
-  }
-
-  .quadrant-cell[data-q="4"] {
-    --cell-from: var(--q4-from);
-    --cell-to: var(--q4-to);
-  }
-
-  /* 表格/数字列对齐 */
+  /* 琛ㄦ牸/鏁板瓧鍒楀榻?*/
   .numeric {
     font-variant-numeric: tabular-nums;
   }
 
-  /* 象限列表的「下面还有」提示。
-     滚动容器里的最后一张卡会被格边硬切成 8px 一条，看起来像渲染缺了一块；
-     底部 14px 做一层 mask 渐隐，半张卡变成「渐出」，同时保留滚动条与命中区。
-     只作用于绘制，不影响布局、不改变任何计算尺寸。
-     只在 ≥768 生效：移动端格体是 overflow-visible、由整页滚动，
-     此时对格体上 mask 会把每格最后一张卡错误地裁淡。 */
-  @media (min-width: 768px) {
-    .scroll-fade {
-      -webkit-mask-image: linear-gradient(
-        to bottom,
-        #000 0,
-        #000 calc(100% - 14px),
-        transparent 100%
-      );
-      mask-image: linear-gradient(
-        to bottom,
-        #000 0,
-        #000 calc(100% - 14px),
-        transparent 100%
-      );
+  /* ==========================================================================
+     鍥涜薄闄愬钩闈?     ========================================================================== */
+
+  .plane-frame {
+    --plane-base: #fffefd;
+    --plane-border: rgba(23, 23, 28, 0.09);
+    --plane-axis: rgba(23, 23, 28, 0.26);
+    --plane-grid: rgba(23, 23, 28, 0.04);
+    --plane-vignette: rgba(24, 24, 40, 0.03);
+    --plane-center: rgba(255, 255, 255, 0.9);
+    --plane-center-soft: rgba(255, 255, 255, 0.36);
+    --plane-q1: rgba(244, 63, 94, 0.1);
+    --plane-q2: rgba(16, 185, 129, 0.095);
+    --plane-q3: rgba(245, 158, 11, 0.105);
+    --plane-q4: rgba(100, 116, 139, 0.09);
+    --plane-dot-ring: rgba(255, 255, 255, 0.96);
+    position: relative;
+    isolation: isolate;
+    border-radius: 24px;
+    border: 1px solid var(--plane-border);
+    background-color: var(--plane-base);
+    /* 鍏佽椤甸潰婊氬姩/缂╂斁锛屼絾鍘绘帀鍙屽嚮缂╂斁锛氬钩闈㈣嚜宸辫鐢ㄥ弻鍑荤┖鐧芥柊寤?*/
+    touch-action: manipulation;
+    box-shadow:
+      0 24px 56px -30px rgba(24, 24, 40, 0.28),
+      0 8px 20px -14px rgba(24, 24, 40, 0.12),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+      inset 0 0 90px rgba(24, 24, 40, 0.035);
+  }
+
+  [data-theme="dark"] .plane-frame {
+    --plane-base: #141419;
+    --plane-border: rgba(255, 255, 255, 0.11);
+    --plane-axis: rgba(255, 255, 255, 0.22);
+    --plane-grid: rgba(255, 255, 255, 0.045);
+    --plane-vignette: rgba(0, 0, 0, 0.28);
+    --plane-center: rgba(255, 255, 255, 0.045);
+    --plane-center-soft: rgba(255, 255, 255, 0.018);
+    --plane-q1: rgba(251, 113, 133, 0.15);
+    --plane-q2: rgba(52, 211, 153, 0.14);
+    --plane-q3: rgba(251, 191, 36, 0.13);
+    --plane-q4: rgba(148, 163, 184, 0.12);
+    --plane-dot-ring: rgba(20, 20, 25, 0.9);
+    box-shadow:
+      0 28px 70px -32px rgba(0, 0, 0, 0.62),
+      0 6px 18px -10px rgba(0, 0, 0, 0.4),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 120px rgba(0, 0, 0, 0.32);
+  }
+
+  .plane-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  /* 鍥涗釜澶栬鎵撳厜锛氭瘡鍧楀彧瑕嗙洊鑷繁鐨?1/2 脳 1/2锛屽厜浠庡钩闈㈡渶澶栬灏勫叆 */
+  .plane-tint {
+    position: absolute;
+    width: 50%;
+    height: 50%;
+    pointer-events: none;
+  }
+
+  .plane-tint-q1 {
+    top: 0;
+    right: 0;
+    background: radial-gradient(155% 155% at 100% 0%, var(--plane-q1) 0%, transparent 80%);
+  }
+
+  .plane-tint-q2 {
+    top: 0;
+    left: 0;
+    background: radial-gradient(155% 155% at 0% 0%, var(--plane-q2) 0%, transparent 80%);
+  }
+
+  .plane-tint-q3 {
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(155% 155% at 100% 100%, var(--plane-q3) 0%, transparent 80%);
+  }
+
+  .plane-tint-q4 {
+    bottom: 0;
+    left: 0;
+    background: radial-gradient(155% 155% at 0% 100%, var(--plane-q4) 0%, transparent 80%);
+  }
+
+  /* 鏋佹贰鐨勫潗鏍囩綉鏍硷細25% / 50% / 75% 涓夋潯锛岃酱浼氱洊浣忎腑闂撮偅鏉?*/
+  .plane-grid-lines {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(to right, var(--plane-grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--plane-grid) 1px, transparent 1px);
+    background-size: 25% 25%;
+    opacity: 0.9;
+  }
+
+  /* 涓績鍘嬬櫧锛氶伩鍏嶅洓鍥㈤鑹插湪鍘熺偣绯婃垚涓€鐗?*/
+  .plane-center-wash {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      38% 42% at 50% 50%,
+      var(--plane-center) 0%,
+      var(--plane-center-soft) 46%,
+      transparent 74%
+    );
+  }
+
+  /* 鏋佹贰鍐呬晶鏆楄锛岃骞抽潰鐨勮竟缂樷€滄敹鈥濊繘鍘讳竴鐐?*/
+  .plane-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(140% 120% at 50% 45%, transparent 62%, var(--plane-vignette) 100%);
+  }
+
+  .plane-drop-zone {
+    position: absolute;
+    width: 50%;
+    height: 50%;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .plane-drop-zone-hot {
+    background-color: color-mix(in srgb, var(--accent) 5%, transparent);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 38%, transparent);
+  }
+
+  /* 鍧愭爣杞达細2px锛屼袱绔笎闅?*/
+  .plane-axis {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .plane-axis-x {
+    top: 50%;
+    right: 18px;
+    left: 18px;
+    height: 2px;
+    transform: translateY(-1px);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--plane-axis) 6%,
+      var(--plane-axis) 94%,
+      transparent 100%
+    );
+  }
+
+  .plane-axis-y {
+    top: 18px;
+    bottom: 18px;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-1px);
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      var(--plane-axis) 6%,
+      var(--plane-axis) 94%,
+      transparent 100%
+    );
+  }
+
+  .plane-axis-arrow {
+    position: absolute;
+    z-index: 2;
+    width: 0;
+    height: 0;
+    opacity: 0.75;
+  }
+
+  .plane-axis-arrow-right {
+    top: calc(50% - 2.5px);
+    right: 10px;
+    border-top: 2.5px solid transparent;
+    border-bottom: 2.5px solid transparent;
+    border-left: 5px solid var(--plane-axis);
+  }
+
+  .plane-axis-arrow-left {
+    top: calc(50% - 2.5px);
+    left: 10px;
+    border-top: 2.5px solid transparent;
+    border-bottom: 2.5px solid transparent;
+    border-right: 5px solid var(--plane-axis);
+  }
+
+  .plane-axis-arrow-up {
+    top: 10px;
+    left: calc(50% - 2.5px);
+    border-right: 2.5px solid transparent;
+    border-bottom: 5px solid var(--plane-axis);
+    border-left: 2.5px solid transparent;
+  }
+
+  .plane-axis-arrow-down {
+    bottom: 10px;
+    left: calc(50% - 2.5px);
+    border-top: 5px solid var(--plane-axis);
+    border-right: 2.5px solid transparent;
+    border-left: 2.5px solid transparent;
+  }
+
+  .plane-tick {
+    position: absolute;
+    z-index: 2;
+    border-radius: 999px;
+    background-color: var(--plane-axis);
+    opacity: 0.45;
+  }
+
+  .plane-axis-cap {
+    position: absolute;
+    z-index: 3;
+    padding: 1px 7px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--surface-solid) 84%, transparent);
+    box-shadow: 0 1px 2px rgba(24, 24, 40, 0.04);
+    color: var(--ink-500);
+    font-size: 11px;
+    line-height: 16px;
+    white-space: nowrap;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+
+  .plane-axis-cap-left {
+    top: 50%;
+    left: 12px;
+    transform: translateY(-50%);
+  }
+
+  .plane-axis-cap-right {
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+  }
+
+  .plane-axis-cap-top {
+    top: 8px;
+    left: calc(50% + 10px);
+  }
+
+  .plane-axis-cap-bottom {
+    bottom: 8px;
+    left: calc(50% + 10px);
+  }
+
+  /* 鍦嗙偣锛?px锛堟墜鏈?11px锛? 2px 鐧界幆 + 寰槾褰?*/
+  .plane-dot-button {
+    position: absolute;
+    z-index: 20;
+    display: flex;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+    cursor: grab;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .plane-dot-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .plane-dot-button.is-dragging {
+    z-index: 60;
+    cursor: grabbing;
+  }
+
+  .plane-dot {
+    position: relative;
+    isolation: isolate;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background-color: var(--plane-dot-color, #94a3b8);
+    box-shadow:
+      0 0 0 2px var(--plane-dot-ring),
+      0 1px 3px rgba(24, 24, 40, 0.24);
+    transition:
+      transform 150ms var(--ease-out),
+      opacity 150ms var(--ease-out);
+    animation: plane-dot-in 180ms var(--ease-out);
+  }
+
+  /* 鍚岃壊鍏夊湀鐢ㄤ吉鍏冪礌鍋氾細鍔ㄦ晥鍙 opacity / transform锛屼笉鍘诲姩 box-shadow */
+  .plane-dot::before {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    z-index: -1;
+    border-radius: 999px;
+    background-color: var(--plane-dot-halo, rgba(148, 163, 184, 0.18));
+    opacity: 0;
+    transform: scale(0.72);
+    transition:
+      opacity 150ms var(--ease-out),
+      transform 150ms var(--ease-out);
+    pointer-events: none;
+  }
+
+  .plane-dot-button:hover .plane-dot,
+  .plane-dot-button.is-hovered .plane-dot {
+    transform: scale(1.4);
+    box-shadow:
+      0 0 0 2px var(--plane-dot-ring),
+      0 2px 6px rgba(24, 24, 40, 0.2);
+  }
+
+  .plane-dot-button:hover .plane-dot::before,
+  .plane-dot-button.is-hovered .plane-dot::before {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .plane-dot-button.is-dragging .plane-dot {
+    transform: scale(1.45);
+    box-shadow:
+      0 0 0 2px var(--plane-dot-ring),
+      0 4px 10px rgba(24, 24, 40, 0.24);
+  }
+
+  .plane-dot-button.is-dragging .plane-dot::before {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+
+  .plane-dot.is-done {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--plane-dot-color, #94a3b8);
+    background-color: transparent;
+  }
+
+  .plane-dot.is-dropped {
+    opacity: 0.4;
+  }
+
+  /* 鏍囩锛氱櫧搴曘€?px 鎻忚竟銆乺adius 8銆?1.5px锛涘搴︾敱 JS 鏄惧紡缁欏嚭 */
+  .plane-label {
+    position: absolute;
+    z-index: 15;
+    display: flex;
+    height: 22px;
+    align-items: center;
+    padding: 0 7px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background-color: var(--surface-solid);
+    box-shadow: 0 1px 2px rgba(24, 24, 40, 0.05);
+    color: var(--ink-900);
+    font-size: 11.5px;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: opacity 140ms var(--ease-out);
+  }
+
+  .plane-label:hover {
+    border-color: var(--border-strong);
+  }
+
+  .plane-label-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .plane-label.is-done {
+    color: var(--ink-500);
+    text-decoration: line-through;
+    opacity: 0.55;
+  }
+
+  .plane-label.is-hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .plane-leader {
+    position: absolute;
+    inset: 0;
+    z-index: 14;
+    overflow: visible;
+    pointer-events: none;
+    stroke: var(--border-strong);
+    stroke-width: 1;
+    fill: none;
+  }
+
+  /* 鎮仠鍗＄墖锛氬 236銆乺adius 13銆佸乏渚х洰鏍囪壊鏉?*/
+  .plane-hover-card {
+    position: absolute;
+    z-index: 45;
+    width: 236px;
+    padding: 8px 10px 8px 13px;
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    background-color: var(--surface-solid);
+    box-shadow: var(--shadow-3);
+    animation: plane-pop 150ms var(--ease-out);
+  }
+
+  .plane-hover-card-title {
+    font-size: 12.5px;
+    line-height: 18px;
+    font-weight: 560;
+    color: var(--ink-900);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .plane-hover-card-meta {
+    margin-top: 2px;
+    color: var(--ink-500);
+    font-size: 10.5px;
+    line-height: 15px;
+    /* 鍏冧俊鎭厑璁告姌涓よ锛氭埅鏂垚銆屾槑澶?20:00 路 #鑻辫 路 @鎶婅嫳璇惉鈥︺€嶆瘮鎹㈣鏇撮毦鐪?*/
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+  }
+
+  .plane-hover-card-bar {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 0;
+    width: 2.5px;
+    border-radius: 999px;
+  }
+
+  /* 鎷栧姩璇绘暟锛氱揣鎬ュ害 0.72 路 閲嶈搴?0.37 */
+  .plane-readout {
+    position: absolute;
+    z-index: 62;
+    padding: 3px 9px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface-solid);
+    box-shadow: var(--shadow-2);
+    color: var(--ink-900);
+    font-size: 11px;
+    line-height: 15px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+    animation: plane-pop 140ms var(--ease-out);
+  }
+
+  /* 鎵嬫満鐐瑰渾鐐瑰悗鐨勬爣棰樺崱鐗?*/
+  .plane-peek {
+    position: absolute;
+    z-index: 58;
+    width: min(248px, calc(100% - 20px));
+    padding: 10px 11px 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface-solid);
+    box-shadow: var(--shadow-3);
+    animation: plane-pop 160ms var(--ease-out);
+  }
+
+  .plane-peek-title {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--ink-900);
+    font-size: 13.5px;
+    line-height: 20px;
+    font-weight: 560;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .plane-peek-meta {
+    margin-top: 2px;
+    color: var(--ink-500);
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  .plane-empty-copy {
+    position: absolute;
+    z-index: 5;
+    top: 50%;
+    left: 50%;
+    width: min(300px, calc(100% - 48px));
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--ink-300);
+    font-size: 12px;
+    line-height: 18px;
+    pointer-events: none;
+  }
+
+  @media (max-width: 640px) {
+    .plane-dot {
+      width: 11px;
+      height: 11px;
     }
+
+    .plane-axis-cap {
+      padding: 0 5px;
+      font-size: 10px;
+    }
+
+    .plane-axis-cap-top {
+      left: calc(50% + 8px);
+    }
+
+    .plane-axis-cap-bottom {
+      left: calc(50% + 8px);
+    }
+  }
+
+  /* 320 杩欑被鏋佺獎灞忥細鍥涜璇存槑涓庝笂涓嬭酱鏍囩娌℃湁鍏卞瓨鐨勬按骞崇┖闂淬€?     闅愯棌璇存槑锛屾妸涓婁笅鏍囩鍘嬪埌鏍囬琛屼笅闈紝浠嶇劧淇濈暀銆屸啈 閲嶈 / 涓嶉噸瑕?鈫撱€嶃€?*/
+  /* 绐勫睆鍏堟敹鎺夊洓瑙掕鏄庯細375 涓婂畠浼氶《鍒板潗鏍囪酱锛岀湅鐫€鍍忔帓鐗堜簨鏁?*/
+  @media (max-width: 480px) {
+    .plane-q-desc {
+      display: none;
+    }
+  }
+
+  @media (max-width: 359px) {
+
+    .plane-axis-cap-top {
+      top: 38px;
+    }
+
+    .plane-axis-cap-bottom {
+      bottom: 38px;
+    }
+  }
+}
+
+@keyframes plane-dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes plane-pop {
+  from {
+    opacity: 0;
+    transform: translateY(3px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
