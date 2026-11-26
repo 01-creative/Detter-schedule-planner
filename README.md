@@ -53,6 +53,24 @@
 
 ## 快速开始
 
+### 最省事：一条命令（Windows）
+
+```powershell
+pnpm install
+.\scripts\dev-up.ps1            # 构建后端 + 起后端 + 起前端 + 打印初始化口令
+```
+
+看到 `应用 http://127.0.0.1:5173` 后打开它，用打印出来的口令初始化。
+想先看看有数据是什么样：
+
+```powershell
+node scripts/seed-demo.mjs --url=http://127.0.0.1:5173 --password=<你刚设的密码>
+```
+
+（会灌 3 个目标 / 1 个 OKR / 3 个 KPI / 8 条任务 / 3 条待整理；不覆盖你已有的数据。）
+
+### 手动
+
 ```bash
 # 1. 安装
 pnpm install
@@ -66,8 +84,6 @@ SETUP_TOKEN=$(openssl rand -hex 24) DETTER_DB=./data/detter.sqlite node dist/ser
 cd apps/web
 DETTER_API_TARGET=http://127.0.0.1:8787 pnpm dev
 ```
-
-打开 <http://127.0.0.1:5173>，用服务端日志里的 `SETUP_TOKEN` 完成初始化。
 
 > **Windows / PowerShell** 用 `$env:SETUP_TOKEN="..."` 的写法。
 > 端口被占用时用 `PORT=8788` 与 `DETTER_API_TARGET` 改到别的端口。
