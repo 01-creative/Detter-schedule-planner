@@ -1,5 +1,6 @@
 import type { InboxItem, ParsedDraft, Quadrant, Task } from "@detter/shared";
 import { markInboxTriaged, saveEntity } from "@/db/repo";
+import { REMINDER_DEFAULT_OFFSET_KEY, readSetting } from "@/lib/settings";
 
 /**
  * 「一条记录」→「一条任务」。
@@ -25,6 +26,8 @@ export interface TaskPatch {
   tags?: string[];
   goalId?: string | null;
   rrule?: string | null;
+  /** 覆盖「新任务默认提前量」；不传则按设置里的默认值 */
+  remindOffsetMin?: number | null;
 }
 
 /** 解析结果 + 用户修正 → repo.saveEntity("task") 的 payload。纯函数，便于单测。 */
@@ -74,6 +77,20 @@ export async function createTaskFromInbox({ item, quadrant, patch = {} }: Create
     quadrant: quadrant ?? item.parsed?.quadrantGuess ?? 2,
     ...patch,
   });
+
+  /**
+   * 「新任务默认提前多少分钟提醒」存在设置里（提醒区块改的就是它）。
+   * 这里补上 `remindOffsets`，否则从收件箱建出来的任务永远按 0 分钟（准点）提醒，
+   * 用户在设置里改的那个值就成了摆设。
+   */
+  const hasTime = payload.startAt != null || payload.dueAt != null;
+  if (hasTime && patch.remindOffsetMin === undefined) {
+    const fallback = await readSetting<number>(REMINDER_DEFAULT_OFFSET_KEY);
+    if (typeof fallback === "number" && Number.isFinite(fallback) && fallback >= 0) {
+      payload.remindOffsets = [fallback];
+    }
+  }
+
   const row = await saveEntity("task", payload);
   const task = row as unknown as Task;
   await markInboxTriaged(item.id, task.id);

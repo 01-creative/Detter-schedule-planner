@@ -1,10 +1,12 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { ChevronRight, LogOut, Monitor, Moon, Search, Settings, Sun } from "lucide-react";
+import { Bell, ChevronRight, LogOut, Monitor, Moon, Search, Settings, Sun } from "lucide-react";
 import { Avatar, Menu, useToast } from "@detter/ui";
 import type { MenuItem } from "@detter/ui";
+import { relativeTime } from "@detter/shared";
 import { useAuth } from "@/app/auth";
 import { getDeviceName } from "@/lib/device";
 import { formatDateLabel } from "@/lib/format";
+import { useNotificationFeed } from "@/lib/notifications";
 import { useUIStore } from "@/stores/ui";
 import { useCaptureStore } from "@/stores/capture";
 import { currentNavItem, viewTitle } from "./nav-items";
@@ -33,6 +35,7 @@ export function TopBar() {
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <SearchPlaceholder />
+          <NotificationBell />
           <SyncBadge />
           <AvatarMenu />
         </div>
@@ -55,10 +58,77 @@ export function MobileHeader() {
         <h1 className="truncate text-h2 text-ink-900">{title}</h1>
       </div>
       <div className="ml-auto flex items-center gap-2">
+        <NotificationBell compact />
         <SyncBadge compact />
         <AvatarMenu />
       </div>
     </header>
+  );
+}
+
+/**
+ * 提醒铃铛。
+ *
+ * 应用内通知是三条提醒渠道里唯一 100% 可靠的一条，但只在「用户能看到」时才成立，
+ * 所以把它提到顶栏：任何页面都能看到未读数，点一条就能跳到对应任务。
+ * 未登录时不渲染（也没有可轮询的东西）。
+ */
+function NotificationBell({ compact = false }: { compact?: boolean }) {
+  const { phase, authenticated, offline } = useAuth();
+  const navigate = useNavigate();
+  const feed = useNotificationFeed(phase === "ready" && (authenticated || offline));
+
+  if (!authenticated && !offline) return null;
+
+  const recent = feed.items.slice(0, 4);
+  const items: MenuItem[] = recent.length
+    ? recent.map((item) => ({
+        key: item.id,
+        label: `${item.readAt ? "" : "● "}${item.title} · ${relativeTime(item.createdAt)}`,
+        onSelect: () => {
+          if (item.taskId) navigate(`/?task=${item.taskId}`);
+          else navigate("/settings");
+        },
+      }))
+    : [{ key: "empty", label: "暂时没有新提醒", onSelect: () => {} }];
+
+  items.push({
+    key: "settings",
+    label: "提醒设置与全部通知",
+    icon: <Settings className="size-4" aria-hidden="true" />,
+    onSelect: () => navigate("/settings"),
+  });
+
+  if (feed.unread > 0) {
+    items.push({
+      key: "read-all",
+      label: `全部标为已读（${feed.unread}）`,
+      onSelect: () => void feed.markAllRead(),
+    });
+  }
+
+  const badge = feed.unread > 9 ? "9+" : String(feed.unread);
+
+  return (
+    <Menu
+      align="end"
+      label="提醒"
+      items={items}
+      trigger={
+        <button
+          type="button"
+          aria-label={feed.unread > 0 ? `提醒（${feed.unread} 条未读）` : "提醒"}
+          className="relative flex size-11 items-center justify-center rounded-md text-ink-500 transition-colors duration-[var(--dur-1)] hover:bg-surface-sunken hover:text-ink-900"
+        >
+          <Bell className={compact ? "size-4" : "size-[18px]"} aria-hidden="true" />
+          {feed.unread > 0 && (
+            <span className="absolute right-1.5 top-1.5 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-strong leading-4 text-white">
+              {badge}
+            </span>
+          )}
+        </button>
+      }
+    />
   );
 }
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type {
   FocusEvent as ReactFocusEvent,
   MouseEvent as ReactMouseEvent,
@@ -187,6 +188,20 @@ export function QuadrantBoard() {
 
   const detailTask = detailId ? (tasksById.get(detailId) ?? null) : null;
   const coordTask = coordId ? (tasksById.get(coordId) ?? null) : null;
+
+  /**
+   * 从系统通知点进来时，URL 上带 `?task=<id>`（提醒的 payload 就是这么拼的）。
+   * 这里直接打开该任务详情，并把参数从地址栏抹掉——否则用户关掉面板后刷新会又弹一次。
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const taskId = searchParams.get("task");
+    if (!taskId) return;
+    setDetailId(taskId);
+    const next = new URLSearchParams(searchParams);
+    next.delete("task");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(
     () => () => {
