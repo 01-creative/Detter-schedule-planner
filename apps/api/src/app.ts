@@ -114,10 +114,16 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
       maxAge: 86_400,
     }),
   );
+  /**
+   * 安全响应头只挂在 /api/* 上。
+   *
+   * 原因：Node 自托管时会用同一个进程托管前端静态资源（见 server.ts），
+   * 而 API 那份 `default-src 'none'` 的 CSP 会把页面自己的 JS/CSS/图标全部拦掉。
+   * 页面的 CSP 由 server.ts 单独下发；Workers 部署只走 API，行为不变。
+   */
   app.use(
-    "*",
+    "/api/*",
     secureHeaders({
-      // API 只返回 JSON，画面由前端负责；这里给最保守的 CSP
       contentSecurityPolicy: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
       crossOriginResourcePolicy: "same-origin",
       crossOriginOpenerPolicy: "same-origin",

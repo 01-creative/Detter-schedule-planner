@@ -18,21 +18,8 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <!-- iOS 主屏图标只认 apple-touch-icon，且必须是 png（svg 会被忽略，退化成网页截图） -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-180.png" />
-    <script>
-      // 主题必须在首帧之前落定，否则深色用户会看到一闪而过的白屏。
-      // 这段代码刻意内联、不依赖任何模块：主包还在下载时它就已经执行完了。
-      (function () {
-        try {
-          var saved = localStorage.getItem("detter.theme") || "system";
-          var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          var dark = saved === "dark" || (saved === "system" && prefersDark);
-          document.documentElement.dataset.theme = dark ? "dark" : "light";
-          document.documentElement.style.colorScheme = dark ? "dark" : "light";
-        } catch (error) {
-          document.documentElement.dataset.theme = "light";
-        }
-      })();
-    </script>
+    <!-- 首帧主题：必须是外链脚本，内联会被生产环境的 CSP（script-src 'self'）拦掉 -->
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -61,6 +61,19 @@ Cloudflare 控制台 → Workers → detter-api → Settings → Domains & Route
 
 ## 方案 B · 自有服务器（Docker，推荐）
 
+> **更简单的选择：单端口模式。**
+> Node 入口会自动查找前端构建产物（`apps/web/dist`），找到就由**同一个进程**同时提供页面与 API：
+>
+> ```powershell
+> .\scripts\serve-local.ps1            # 默认 http://127.0.0.1:10101
+> ```
+>
+> 一个进程、一个端口、一个 SQLite 文件，不需要 Nginx / Vite / Docker。
+> 本机验收就用这个模式；放到公网时前面套一层 cloudflared 或 Nginx 即可。
+>
+> 安全上做了路径分流：`/api/*` 用最严格的 `default-src 'none'` CSP，
+> 页面用 `default-src 'self'` 的文档 CSP（详见 `05-SECURITY.md` §2.4）。
+
 ### 1. 打包
 
 ```bash
