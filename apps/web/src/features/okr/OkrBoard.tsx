@@ -193,7 +193,7 @@ export function OkrBoard() {
     <div className="mx-auto w-full max-w-5xl">
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-          <p className="text-micro text-ink-300">OKR · 方向落到可量化的关键结果</p>
+          <p className="text-caption text-ink-500">OKR · 方向落到可量化的关键结果</p>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
             <div className="flex items-center gap-1">
               <Button
@@ -222,7 +222,7 @@ export function OkrBoard() {
               </Button>
             </div>
             <h1 className="tabular text-h1 text-ink-900">{range.label}</h1>
-            <p className="tabular text-micro text-ink-300">{range.caption}</p>
+            <p className="tabular text-micro text-ink-500">{range.caption}</p>
           </div>
         </div>
 

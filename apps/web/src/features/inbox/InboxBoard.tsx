@@ -4,6 +4,7 @@ import type { InboxItem, Task } from "@detter/shared";
 import { Button, Dialog, cn, useToast } from "@detter/ui";
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
+import { PageHeading } from "@/components/common/PageHeading";
 import { useActiveGoals, useInboxItems, useTasks } from "@/db/hooks";
 import { useCaptureStore } from "@/stores/capture";
 import { InboxCard } from "./InboxCard";
@@ -268,14 +269,12 @@ export function InboxBoard() {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-caption text-ink-500">先收进来，之后再决定</p>
-          <h1 className="mt-1 text-h1 text-ink-900">收件箱</h1>
-          <p className="mt-1 text-body text-ink-500">
-            所有来不及整理的想法都在这里，离线写下的一条也不会丢。
-          </p>
-        </div>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <PageHeading
+          eyebrow="先收进来，之后再决定"
+          title="收件箱"
+          description="所有来不及整理的想法都在这里，离线写下的一条也不会丢。"
+        />
         <Button size="sm" onClick={() => openCapture()}>
           记一条
         </Button>

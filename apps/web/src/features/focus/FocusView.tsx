@@ -3,6 +3,7 @@ import { Pause, Play, Settings2, SkipForward, Square, Target } from "lucide-reac
 import type { Task } from "@detter/shared";
 import { Badge, Button, Card, useToast } from "@detter/ui";
 import { LoadingState } from "@/components/common/LoadingState";
+import { PageHeading } from "@/components/common/PageHeading";
 import { useTasks } from "@/db/hooks";
 import { formatWhen } from "@/lib/format";
 import { FocusMiniBar } from "./FocusMiniBar";
@@ -183,16 +184,16 @@ export function FocusView() {
       />
 
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-caption text-ink-500">25 分钟只做一件事</p>
-          <h1 className="mt-1 text-h1 text-ink-900">专注</h1>
-          <p className="mt-1 max-w-xl text-body text-ink-500">
-            这一轮只认一个数：目标结束时间。刷新、切后台、锁屏回来，剩余时间都按真实时钟校正。
-          </p>
-        </div>
+        <PageHeading
+          eyebrow="25 分钟只做一件事"
+          title="专注"
+          description="这一轮只认一个数：目标结束时间。刷新、切后台、锁屏回来，剩余时间都按真实时钟校正。"
+        />
         <Button
           size="icon"
           variant="ghost"
+          // 窄屏换行后按钮要留在右边（旧版会掉到标题下方最左侧）
+          className="ml-auto"
           aria-label="番茄钟设置"
           onClick={() => setSettingsOpen(true)}
         >

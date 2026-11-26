@@ -70,4 +70,27 @@
   .numeric {
     font-variant-numeric: tabular-nums;
   }
+
+  /* 象限列表的「下面还有」提示。
+     滚动容器里的最后一张卡会被格边硬切成 8px 一条，看起来像渲染缺了一块；
+     底部 14px 做一层 mask 渐隐，半张卡变成「渐出」，同时保留滚动条与命中区。
+     只作用于绘制，不影响布局、不改变任何计算尺寸。
+     只在 ≥768 生效：移动端格体是 overflow-visible、由整页滚动，
+     此时对格体上 mask 会把每格最后一张卡错误地裁淡。 */
+  @media (min-width: 768px) {
+    .scroll-fade {
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        #000 0,
+        #000 calc(100% - 14px),
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        #000 0,
+        #000 calc(100% - 14px),
+        transparent 100%
+      );
+    }
+  }
 }

@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { cn } from "@detter/ui";
 import type { KpiSeriesPoint, KpiTone } from "./kpiModel";
 import { formatKpiValue } from "./kpiModel";
 
@@ -56,9 +57,25 @@ export function KpiChart({
   const gradientId = `kpi-fill-${uid}`;
   const stroke = toneColor(tone, color);
   const values = points.map((point) => point.value);
+  const hasData = points.some((point) => point.hasData);
   const max = Math.max(target, 1, ...values);
   const count = Math.max(1, points.length);
   const mode = points.length <= 1 ? "bar" : variant;
+
+  /**
+   * 整个周期一条记录都没有：不要画图。
+   *
+   * 之前 points 里每天都有值 0，折线会沿着图表底边画一条 0 值线 ——
+   * 看起来像"渲染坏了一根彩线"，而不是"还没有数据"。
+   * 空态带高度固定 72px（与图表一致），卡片高度不会跳。
+   */
+  if (!hasData) {
+    return (
+      <div className={cn("flex h-[72px] items-center justify-center rounded-md bg-surface-sunken/50", className)}>
+        <span className="text-micro text-ink-300">这一周期还没有记录</span>
+      </div>
+    );
+  }
 
   const xOf = (index: number) =>
     count === 1 ? WIDTH / 2 : PAD_X + (index * (WIDTH - PAD_X * 2)) / (count - 1);

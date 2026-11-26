@@ -5,6 +5,7 @@ import type { MindMap } from "@detter/shared";
 import { Button, EmptyState, Menu, useToast, type MenuItem } from "@detter/ui";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { LoadingState } from "@/components/common/LoadingState";
+import { PageHeading } from "@/components/common/PageHeading";
 import { MindMapStage } from "./MindMapStage";
 import { MapCreateDialog, type CreateMode } from "./MapCreateDialog";
 import { removeMindMap } from "./mindmap-actions";
@@ -122,8 +123,13 @@ export function MindMapShell() {
   return (
     <div className="flex h-[calc(100dvh-13.75rem)] min-h-[440px] flex-col gap-3 md:h-[calc(100dvh-10.75rem)]">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <PageHeading
+          eyebrow="思维导图 · 一张图只拆一个目标"
+          title="思维导图"
+          className="shrink-0"
+        />
         <div className="flex min-w-0 items-center gap-2">
-          {activeMap ? (
+          {activeMap && (
             <Menu
               align="start"
               label="切换或管理导图"
@@ -139,8 +145,6 @@ export function MindMapShell() {
               }
               items={menuItems}
             />
-          ) : (
-            <h1 className="text-h1 text-ink-900">思维导图</h1>
           )}
           {activeMap && (
             <p className="tabular text-micro text-ink-500">

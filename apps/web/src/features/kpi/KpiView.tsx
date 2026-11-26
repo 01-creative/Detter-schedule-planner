@@ -4,6 +4,7 @@ import type { Kpi, KpiPeriod } from "@detter/shared";
 import { Button, Dialog, Tabs, useToast } from "@detter/ui";
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
+import { PageHeading } from "@/components/common/PageHeading";
 import { KpiCard } from "./KpiCard";
 import { KpiFormDialog } from "./KpiFormDialog";
 import {
@@ -199,13 +200,11 @@ export function KpiView() {
   return (
     <div className="mx-auto w-full max-w-6xl">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-caption text-ink-500">把时间投入变成看得见的变化</p>
-          <h1 className="mt-1 text-h1 text-ink-900">KPI</h1>
-          <p className="mt-1 max-w-xl text-body text-ink-500">
-            手工打卡与自动汇总并存：番茄钟分钟、专注次数、完成任务数都能直接变成指标，不用手填。
-          </p>
-        </div>
+        <PageHeading
+          eyebrow="把时间投入变成看得见的变化"
+          title="KPI"
+          description="手工打卡与自动汇总并存：番茄钟分钟、专注次数、完成任务数都能直接变成指标，不用手填。"
+        />
         <div className="flex flex-wrap items-center gap-2">
           <Tabs
             variant="pill"

@@ -28,6 +28,8 @@ import { retryFailed, syncNow } from "@/sync/client";
 import { useSyncStatus } from "@/sync/useSyncStatus";
 import { useUIStore, type ThemeMode } from "@/stores/ui";
 import { InstallCard } from "@/components/shell/InstallCard";
+import { PageHeading } from "@/components/common/PageHeading";
+import { SectionLabel } from "@/components/common/SectionLabel";
 
 /**
  * 设置页。
@@ -85,8 +87,10 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
       <header>
-        <p className="text-caption text-ink-500">数据在你的设备上，服务端只是其中一份副本</p>
-        <h1 className="mt-1 text-h1 text-ink-900">设置</h1>
+        <PageHeading
+          eyebrow="数据在你的设备上，服务端只是其中一份副本"
+          title="设置"
+        />
       </header>
 
       <Card className="space-y-4">
@@ -117,21 +121,21 @@ export default function SettingsPage() {
         </div>
 
         <dl className="grid grid-cols-2 gap-3 text-caption sm:grid-cols-4">
-          <div className="rounded-md bg-surface-sunken px-3 py-2">
+          <div className="rounded-md border border-border bg-surface-sunken px-3 py-2">
             <dt className="text-ink-500">待推送</dt>
             <dd className="numeric mt-0.5 text-body font-strong text-ink-900">{pending}</dd>
           </div>
-          <div className="rounded-md bg-surface-sunken px-3 py-2">
+          <div className="rounded-md border border-border bg-surface-sunken px-3 py-2">
             <dt className="text-ink-500">死信</dt>
             <dd className={cn("numeric mt-0.5 text-body font-strong", dead > 0 ? "text-danger-ink" : "text-ink-900")}>
               {dead}
             </dd>
           </div>
-          <div className="rounded-md bg-surface-sunken px-3 py-2">
+          <div className="rounded-md border border-border bg-surface-sunken px-3 py-2">
             <dt className="text-ink-500">上次成功</dt>
             <dd className="mt-0.5 text-body font-strong text-ink-900">{formatSyncTime(lastSyncAt)}</dd>
           </div>
-          <div className="rounded-md bg-surface-sunken px-3 py-2">
+          <div className="rounded-md border border-border bg-surface-sunken px-3 py-2">
             <dt className="text-ink-500">游标</dt>
             <dd className="mt-0.5 truncate text-body font-strong text-ink-900">
               {lastSyncAt ? "已建立" : "等待首次同步"}
@@ -171,10 +175,13 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      <SectionLabel className="pt-2">AI 与自动化</SectionLabel>
       <AISettingsSection />
 
+      <SectionLabel className="pt-2">提醒与通知</SectionLabel>
       <ReminderSettingsSection />
 
+      <SectionLabel className="pt-2">外观与设备</SectionLabel>
       <Card className="space-y-3">
         <h2 className="text-h2 text-ink-900">外观</h2>
         <div className="flex flex-wrap gap-2" role="group" aria-label="外观模式">
@@ -229,12 +236,13 @@ export default function SettingsPage() {
 
       <InstallCard />
 
+      <SectionLabel className="pt-2">数据与关于</SectionLabel>
       <Card className="space-y-3">
         <div className="flex items-center gap-2">
           <Database className="size-4 text-accent" aria-hidden="true" />
           <h2 className="text-h2 text-ink-900">本地数据</h2>
         </div>
-        <div className="flex items-center justify-between gap-3 rounded-md bg-surface-sunken px-3 py-2">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-sunken px-3 py-2">
           <div>
             <p className="text-caption text-ink-900">同步后自动导出备份</p>
             <p className="text-micro text-ink-300">占位开关：T12 接入完整的备份策略</p>

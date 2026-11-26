@@ -1,6 +1,9 @@
+import { Fragment } from "react";
+import type { ReactNode } from "react";
 import { Button, Menu, Tabs, cn } from "@detter/ui";
 import type { MenuItem } from "@detter/ui";
 import { ArrowUpDown, Ellipsis, PanelRightClose, PanelRightOpen, Target } from "lucide-react";
+import { PageHeading } from "@/components/common/PageHeading";
 import type { BoardStats } from "./stats";
 import type { SortMode, ViewMode } from "./types";
 
@@ -9,6 +12,12 @@ import type { SortMode, ViewMode } from "./types";
  *
  * 三个数字里最重要的是 Q2 占比：它衡量的是「有没有在做重要但不紧急的事」。
  * 视图切换放这里而不是藏进菜单，是因为它是这个页面最常用的开关之一。
+ *
+ * 空数据纪律（T15）：
+ * - 没有任务时不再输出「今日 0 · 逾期 0 · Q2 占比 0%」——三个 0 不提供信息，只占首屏；
+ *   改成一句引导，等有第一条任务再回到数字。
+ * - 有任务但今天没有到期项时，把「今日 0」换成「今日 没有到期的事」；
+ *   逾期只在 >0 时出现（0 逾期不需要占一个位置）。
  */
 export interface BoardStatsBarProps {
   stats: BoardStats;
@@ -21,6 +30,13 @@ export interface BoardStatsBarProps {
   goalRailCollapsed: boolean;
 }
 
+interface Metric {
+  key: string;
+  label: string;
+  value: ReactNode;
+  tone?: "danger";
+}
+
 export function BoardStatsBar({
   stats,
   viewMode,
@@ -31,6 +47,19 @@ export function BoardStatsBar({
   onToggleGoalRail,
   goalRailCollapsed,
 }: BoardStatsBarProps) {
+  const hasTasks = stats.open > 0;
+  const metrics: Metric[] = [];
+  if (stats.overdue > 0) {
+    metrics.push({ key: "overdue", label: "逾期", value: stats.overdue, tone: "danger" });
+  }
+  if (stats.today > 0) {
+    metrics.push({ key: "today", label: "今日", value: stats.today });
+  }
+  if (metrics.length === 0) {
+    metrics.push({ key: "clear", label: "今日", value: "没有到期的事" });
+  }
+  metrics.push({ key: "q2", label: "Q2 占比", value: `${stats.q2Share}%` });
+
   const mobileItems: MenuItem[] = [
     {
       key: "view-list",
@@ -69,34 +98,48 @@ export function BoardStatsBar({
   ];
 
   return (
-    <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
-      <div className="flex items-baseline gap-2">
-        <h1 className="hidden text-h2 text-ink-900 sm:block">四象限</h1>
-        <p className="hidden text-caption text-ink-300 lg:block">先做重要的事</p>
-      </div>
-
-      <dl className="flex items-center gap-3 text-caption" aria-label="今日概览">
-        <div className="flex items-baseline gap-1">
-          <dt className="text-ink-500">今日</dt>
-          <dd className="tabular font-strong text-ink-900">{stats.today}</dd>
-        </div>
-        <span aria-hidden="true" className="text-ink-300">
-          ·
-        </span>
-        <div className="flex items-baseline gap-1">
-          <dt className={stats.overdue > 0 ? "text-danger-ink" : "text-ink-500"}>逾期</dt>
-          <dd className={cn("tabular font-strong", stats.overdue > 0 ? "text-danger-ink" : "text-ink-900")}>
-            {stats.overdue}
-          </dd>
-        </div>
-        <span aria-hidden="true" className="text-ink-300">
-          ·
-        </span>
-        <div className="flex items-baseline gap-1">
-          <dt className="text-ink-500">Q2 占比</dt>
-          <dd className="tabular font-strong text-ink-900">{stats.q2Share}%</dd>
-        </div>
-      </dl>
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <PageHeading
+        eyebrow={
+          hasTasks ? (
+            <div
+              className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
+              role="group"
+              aria-label="今日概览"
+            >
+              {metrics.map((metric, index) => (
+                <Fragment key={metric.key}>
+                  {index > 0 && (
+                    <span aria-hidden="true" className="text-ink-300">
+                      ·
+                    </span>
+                  )}
+                  <span className="inline-flex items-baseline gap-1">
+                    <span className={metric.tone === "danger" ? "text-danger-ink" : "text-ink-500"}>
+                      {metric.label}
+                    </span>
+                    <span
+                      className={cn(
+                        "font-strong",
+                        metric.tone === "danger" ? "text-danger-ink" : "text-ink-900",
+                        typeof metric.value === "number" && "tabular",
+                      )}
+                    >
+                      {metric.value}
+                    </span>
+                  </span>
+                </Fragment>
+              ))}
+            </div>
+          ) : (
+            <span>空白的一页 —— 从下面任意一格开始</span>
+          )
+        }
+        title="四象限"
+        titleAddon={
+          <p className="hidden text-caption text-ink-300 lg:block">先做重要的事</p>
+        }
+      />
 
       <div className="ml-auto flex items-center gap-1.5">
         <Tabs

@@ -82,7 +82,9 @@ function TaskCardImpl({
   const tagLimit = compact ? 1 : 2;
   const extraTags = Math.max(0, task.tags.length - tagLimit);
   const shownTags = task.tags.slice(0, tagLimit);
-  const barColor = done ? "var(--ink-300)" : (goal?.color ?? "transparent");
+  // 没有目标时不再用 transparent：左侧 3px 竖条是这张卡的「第一个视觉锚点」，
+  // 透明会让整张卡看起来少渲染了一块。用边框色当默认竖条 —— 存在感弱，但结构完整。
+  const barColor = done ? "var(--ink-300)" : (goal?.color ?? null);
   const hasMeta = Boolean(time) || Boolean(task.location) || shownTags.length > 0;
 
   return (
@@ -124,6 +126,9 @@ function TaskCardImpl({
         "group/card relative flex w-full cursor-default touch-pan-y flex-col rounded-lg border border-border bg-surface-solid pr-3 pl-3 shadow-1",
         "transition-[box-shadow,transform,opacity,border-color] duration-[var(--dur-1)] ease-[var(--ease-out)]",
         compact ? "min-h-9 gap-0.5 py-1.5" : "min-h-11 gap-1 py-2.5",
+        // 只有标题的卡片：内容居中，避免 44px 的盒子里「头重脚轻」；
+        // 有第二行信息时保持顶部对齐，让时间/标签贴近标题。
+        !hasMeta && !compact && "justify-center",
         // hover 只抬 1px：这个页面一天要开十几次，动效不能抢注意力
         !dragging && !done && "hover:-translate-y-px hover:shadow-2",
         done && "opacity-60",
@@ -131,11 +136,14 @@ function TaskCardImpl({
         dragging && "rotate-[.4deg] scale-[1.03] cursor-grabbing opacity-95 shadow-3",
       )}
     >
-      {/* 左侧竖条 = 目标色；完成态变灰 */}
+      {/* 左侧竖条 = 目标色；无目标时用默认描边色，完成态变灰 */}
       <span
         aria-hidden="true"
-        className="absolute inset-y-1.5 left-0 w-[3px] rounded-r-full"
-        style={{ backgroundColor: barColor }}
+        className={cn(
+          "absolute inset-y-1.5 left-0 w-[3px] rounded-r-full",
+          !barColor && "bg-border-strong",
+        )}
+        style={barColor ? { backgroundColor: barColor } : undefined}
       />
 
       <div className="flex items-start gap-1.5">

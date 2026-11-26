@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { CalendarDays } from "lucide-react";
 import { startOfDay } from "@detter/shared";
 import { cn } from "@detter/ui";
 import { formatWeekday } from "@/lib/format";
@@ -125,7 +126,7 @@ export function TimelineGrid({
     <section
       aria-label={days.length === 1 ? "日视图" : "周视图"}
       className={cn(
-        "flex min-h-[360px] flex-col overflow-hidden rounded-xl border border-border bg-surface-solid shadow-1",
+        "relative flex min-h-[360px] flex-col overflow-hidden rounded-xl border border-border bg-surface-solid shadow-1",
         // 让网格吃掉工具条以下的剩余高度（移动端工具条会折行，所以留得更多）
         "h-[calc(100dvh-22rem)] md:h-[calc(100dvh-12rem)]",
       )}
@@ -303,6 +304,21 @@ export function TimelineGrid({
           </div>
         </div>
       </div>
+
+      {/* 空周/空日：整屏网格是「信息」，但没有「下一步」。
+          这里叠一张不拦指针的空态卡，点任意空白时段仍然直接新建。
+          用 items.length 判空而不是 days：一列有事件就说明这屏不是空的。 */}
+      {items.length === 0 && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-4">
+          <div className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-surface-solid/90 px-5 py-4 text-center shadow-1 backdrop-blur-sm">
+            <CalendarDays className="size-5 text-ink-300" aria-hidden="true" />
+            <p className="text-caption font-strong text-ink-900">
+              {days.length === 1 ? "这一天还空着" : "这一周还空着"}
+            </p>
+            <p className="text-micro text-ink-500">点任意空白时段新建；拖动事件即可改期</p>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

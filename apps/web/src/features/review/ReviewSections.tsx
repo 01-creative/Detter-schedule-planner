@@ -88,7 +88,7 @@ function Stat({
   tone?: "neutral" | "success" | "danger";
 }) {
   return (
-    <div className="rounded-lg bg-surface-sunken/70 px-3 py-2">
+    <div className="rounded-lg border border-border bg-surface-sunken px-3 py-2">
       <dt className="text-micro text-ink-500">{label}</dt>
       <dd
         className={cn(

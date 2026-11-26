@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { ChevronDown, Plus } from "lucide-react";
+import { BellRing, ChevronDown, Coffee, Plus, Sprout, Zap } from "lucide-react";
 import type { Goal, Quadrant, Task } from "@detter/shared";
 import { QUADRANT_META } from "@detter/shared";
 import { cn } from "@detter/ui";
@@ -8,6 +8,40 @@ import { TaskCard } from "@/components/common/TaskCard";
 import { InlineComposer } from "./InlineComposer";
 import { stackOffsets } from "./geometry";
 import type { ViewMode } from "./types";
+
+/**
+ * 四格的空态文案。
+ *
+ * 之前四格共用「双击空白，或把任务拖到这里」—— 用户第一眼看到四个一模一样的占位，
+ * 会以为这一屏还没做完。空态是第一次打开时唯一的信息，应该替人做一次判断：
+ * Q1「今天就躲不掉」、Q2「值得提前投资」、Q3「别人在等你」、Q4「可以不做」。
+ * 交互提示（双击新建 / 拖进来）仍然统一放在最后一行，不抢主句。
+ */
+const EMPTY_COPY: Record<
+  Quadrant,
+  { title: string; description: string; icon: typeof Zap }
+> = {
+  1: {
+    title: "今天就躲不掉的事",
+    description: "截止就是今天、非你不可的，先放进来。",
+    icon: Zap,
+  },
+  2: {
+    title: "值得提前投资的事",
+    description: "学习、健康、关系——不催你，但越早做越值钱。",
+    icon: Sprout,
+  },
+  3: {
+    title: "别人在等你的事",
+    description: "临时消息、他人请求；先记下，再决定做还是推掉。",
+    icon: BellRing,
+  },
+  4: {
+    title: "可以不做的事",
+    description: "刷一会儿、随便逛逛；空着也是答案。",
+    icon: Coffee,
+  },
+};
 
 /**
  * 一个象限格。
@@ -230,7 +264,9 @@ export function QuadrantCell({
         data-quadrant-body=""
         className={cn(
           "relative min-h-0 flex-1 px-2.5 pb-2 md:pb-2.5",
-          free ? "overflow-hidden max-md:min-h-[300px]" : "overflow-y-auto overscroll-contain max-md:overflow-visible",
+          free
+            ? "overflow-hidden max-md:min-h-[300px]"
+            : "scroll-fade overflow-y-auto overscroll-contain max-md:overflow-visible",
           collapsed && "hidden md:block",
         )}
       >
@@ -263,7 +299,9 @@ export function QuadrantCell({
               </div>
             )}
 
-            {tasks.length === 0 && !composer && <CellEmptyHint accent={accent} free />}
+            {tasks.length === 0 && !composer && (
+              <CellEmptyHint quadrant={quadrant} accent={accent} free />
+            )}
           </div>
         ) : (
           <>
@@ -288,7 +326,7 @@ export function QuadrantCell({
                 </li>
               ))}
             </ul>
-            {tasks.length === 0 && !composer && <CellEmptyHint accent={accent} />}
+            {tasks.length === 0 && !composer && <CellEmptyHint quadrant={quadrant} accent={accent} />}
           </>
         )}
       </div>
@@ -296,22 +334,42 @@ export function QuadrantCell({
   );
 }
 
-function CellEmptyHint({ accent, free = false }: { accent: string; free?: boolean }) {
+function CellEmptyHint({
+  quadrant,
+  accent,
+  free = false,
+}: {
+  quadrant: Quadrant;
+  accent: string;
+  free?: boolean;
+}) {
+  const copy = EMPTY_COPY[quadrant];
+  const Icon = copy.icon;
+
   return (
     <div
       className={cn(
-        "pointer-events-none flex flex-col items-center justify-center gap-2 px-4 text-center",
-        free ? "absolute inset-0" : "py-6",
+        "pointer-events-none flex flex-col items-center justify-center px-4 text-center",
+        free ? "absolute inset-0 gap-2.5" : "gap-2 py-4 sm:py-6",
       )}
     >
-      <span
-        aria-hidden="true"
-        className="size-10 rounded-full"
-        style={{
-          backgroundImage: `radial-gradient(circle at 35% 30%, ${accent}33 0%, transparent 70%)`,
-        }}
-      />
-      <p className="text-caption text-ink-500/70">双击空白，或把任务拖到这里</p>
+      {/* 插画用「象限色光晕 + 同色系图标」：旧版把 `var(--qN-accent)` 拼上 `33` 当颜色，
+          那不是合法 CSS 颜色，圆点一直是透明的 —— 空态等于没有插画。 */}
+      <span aria-hidden="true" className="relative hidden size-9 items-center justify-center sm:flex">
+        <span
+          className="absolute inset-0 rounded-full"
+          style={{
+            backgroundImage: `radial-gradient(circle at 35% 30%, var(--q${quadrant}-soft) 0%, transparent 72%)`,
+          }}
+        />
+        <Icon className="relative size-4" style={{ color: accent }} aria-hidden="true" />
+      </span>
+      <p className="max-w-[22ch] text-body font-strong text-ink-900">{copy.title}</p>
+      {/* lg 以上格头已经有象限 hint，这里不再重复第二句，只保留第一句 + 交互提示 */}
+      <p className="hidden max-w-[26ch] text-micro text-ink-500 sm:block lg:hidden">
+        {copy.description}
+      </p>
+      <p className="text-micro text-ink-500">双击空白新建 · 拖任务进来</p>
     </div>
   );
 }

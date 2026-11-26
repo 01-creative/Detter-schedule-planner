@@ -15,9 +15,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import { formatDateTime } from "@detter/shared";
-import { Badge, Button, Tabs, cn, useToast } from "@detter/ui";
+import { Badge, Button, Tabs, useToast } from "@detter/ui";
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
+import { PageHeading } from "@/components/common/PageHeading";
+import { SectionLabel } from "@/components/common/SectionLabel";
 import { buildReviewJson, buildReviewJsonFromSnapshot, copyText, downloadText, reviewFileName } from "./export";
 import { buildReviewMarkdown } from "./markdown";
 import {
@@ -268,15 +270,13 @@ export function ReviewBoard() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <p className="text-micro text-ink-300">复盘 · 只用本地数据</p>
-          <h1 className="mt-0.5 text-h1 text-ink-900">
-            {rangeTitle(range)}
-            <span className="tabular ml-2 text-h2 text-ink-500">{range.label}</span>
-          </h1>
-          <p className="tabular mt-0.5 text-caption text-ink-500">{range.caption}</p>
-        </div>
+      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <PageHeading
+          eyebrow="复盘 · 只用本地数据"
+          title={rangeTitle(range)}
+          titleAddon={<span className="tabular text-h2 text-ink-500">{range.label}</span>}
+          description={<span className="tabular">{range.caption}</span>}
+        />
         <Tabs
           items={tabs}
           value={activeRangeKey}
@@ -291,28 +291,32 @@ export function ReviewBoard() {
         />
       </header>
 
-      <div className="mt-3 flex items-start gap-2 rounded-lg border border-border bg-info-soft px-3 py-2">
+      <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-info-soft px-3 py-2">
         <Info className="mt-0.5 size-3.5 shrink-0 text-info-ink" aria-hidden="true" />
         <p className="min-w-0 text-micro text-info-ink">
-          想更深度的分析？把这份 Markdown 连同「上下文包」（
-          <Link to="/settings" className="underline decoration-info-ink/30 underline-offset-2">
-            设置 → AI 接入
+          想更深度的分析？把 Markdown 连同
+          <Link to="/settings" className="mx-1 underline decoration-info-ink/30 underline-offset-2">
+            上下文包
           </Link>
-          ）一起给 AI。页面上的每个数字都能在 JSON 里找到对应字段。
+          一起给 AI，页面上的数字都能在 JSON 里找到。
         </p>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2">
-        <Badge tone={showingSnapshot ? "accent" : "neutral"} dot>
-          {showingSnapshot ? "快照" : "实时计算"}
-        </Badge>
-        <span className="text-micro text-ink-300">
-          {showingSnapshot
-            ? `${formatDateTime(activeGeneratedAt)} 生成 · 不随数据变化`
-            : `${formatDateTime(now)} 计算 · 未保存`}
-        </span>
+      {/* 工具条分两行：状态（快照/实时）一行，动作一行。
+          窄屏不再让 .md / .json / 保存快照挤成「2+1」并留下一条悬空分隔线。 */}
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone={showingSnapshot ? "accent" : "neutral"} dot>
+            {showingSnapshot ? "快照" : "实时计算"}
+          </Badge>
+          <span className="text-micro text-ink-300">
+            {showingSnapshot
+              ? `${formatDateTime(activeGeneratedAt)} 生成 · 不随数据变化`
+              : `${formatDateTime(now)} 计算 · 未保存`}
+          </span>
+        </div>
 
-        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
           <Button
             size="sm"
             variant="ghost"
@@ -337,7 +341,7 @@ export function ReviewBoard() {
           >
             .json
           </Button>
-          <span aria-hidden="true" className="mx-1 h-4 w-px bg-border-strong" />
+          <span aria-hidden="true" className="mx-1 hidden h-4 w-px bg-border-strong sm:block" />
           {showingSnapshot ? (
             <>
               <Button
@@ -351,6 +355,7 @@ export function ReviewBoard() {
               <Button
                 size="sm"
                 variant="primary"
+                className="order-first sm:order-none"
                 loading={saving}
                 leftIcon={<RefreshCw className="size-3.5" aria-hidden="true" />}
                 onClick={() => void handleSave()}
@@ -362,6 +367,7 @@ export function ReviewBoard() {
             <Button
               size="sm"
               variant="primary"
+              className="order-first sm:order-none"
               loading={saving}
               leftIcon={<Save className="size-3.5" aria-hidden="true" />}
               onClick={() => void handleSave()}
@@ -389,7 +395,7 @@ export function ReviewBoard() {
       )}
 
       {isEmpty ? (
-        <div className="mt-4 rounded-xl border border-dashed border-border-strong bg-surface">
+        <div className="mt-5 rounded-xl border border-dashed border-border-strong bg-surface">
           <EmptyState
             icon={<BookOpen className="size-6" aria-hidden="true" />}
             title={`${rangeWord(range)}还没有记录`}
@@ -405,7 +411,7 @@ export function ReviewBoard() {
         </div>
       ) : (
         <>
-          <div className="mt-3">
+          <div className="mt-5">
             <ReviewHero
               metrics={activeMetrics}
               narrative={activeNarrative}
@@ -414,7 +420,10 @@ export function ReviewBoard() {
             />
           </div>
 
-          <div className="mt-3 grid gap-3 lg:grid-cols-12">
+          {/* 区块节奏：结论（mt-5 / 卡内 16）→ 分组标题（mt-6）→ 明细（gap-4）。
+              之前所有块都是 12px，结论、数据、备注读起来一样重。 */}
+          <SectionLabel className="mt-6">这几件事值得看</SectionLabel>
+          <div className="mt-3 grid gap-4 lg:grid-cols-12">
             <div className="min-w-0 lg:col-span-7">
               <QuadrantCard metrics={activeMetrics} />
             </div>
@@ -440,7 +449,7 @@ export function ReviewBoard() {
         </>
       )}
 
-      <div className={cn("mt-3", isEmpty && "mt-4")}>
+      <div className="mt-6">
         <SnapshotHistory
           snapshots={snapshots}
           loading={snapshotsLoading}
