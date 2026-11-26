@@ -93,6 +93,9 @@ export default function SettingsPage() {
         />
       </header>
 
+      {/* 第一组也要有标签：否则「同步与数据」看起来是孤儿，而下面的分组又都有 */}
+      <SectionLabel className="pt-2">同步与数据</SectionLabel>
+
       <Card className="space-y-4">
         <div className="flex items-center gap-2">
           <Cloud className="size-4 text-accent" aria-hidden="true" />

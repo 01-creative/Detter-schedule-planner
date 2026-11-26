@@ -35,9 +35,11 @@ export default tseslint.config(
       "**/playwright-report/**",
       "**/test-results/**",
       "**/*.d.ts",
-      // 临时目录与 QA 产物（agent 跑验证时留下的脚本），不属于产品代码
+      // 临时目录与 QA 产物（agent 跑验证时留下的脚本/打包产物），不属于产品代码
       ".tmp/**",
       ".qa/**",
+      "**/.tmp-worker/**",
+      "apps/api/dist/**",
       "apps/web/dist/**",
       // Service Worker 有自己的运行环境（self / caches / clients），单独处理
       "apps/web/public/sw.js",
