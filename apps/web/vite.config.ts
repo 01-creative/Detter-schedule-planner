@@ -19,6 +19,14 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 5173,
     strictPort: false,
+    /**
+     * Windows 上编辑器/工具常用「临时目录 + rename」原子写文件，
+     * chokidar 会去 watch 那个临时的 `.xxx.tmpdir` 目录，随后的删除会抛 EBUSY 把 dev server 带崩。
+     * 忽略这些中间产物，开发时就再也不会被别人的写文件动作打断。
+     */
+    watch: {
+      ignored: ["**/.*.tmpdir/**", "**/*.tmp", "**/*.tmpdir/**"],
+    },
     proxy: {
       "/api": {
         // 允许用环境变量改后端地址（本机 8787 常被别的服务占用时很有用）

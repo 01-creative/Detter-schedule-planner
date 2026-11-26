@@ -13,6 +13,7 @@ import { RedirectIfAuthenticated, RequireAuth } from "./guards";
 const InboxPage = lazy(() => import("@/pages/InboxPage"));
 const CalendarPage = lazy(() => import("@/pages/CalendarPage"));
 const OkrPage = lazy(() => import("@/pages/OkrPage"));
+const ReviewPage = lazy(() => import("@/pages/ReviewPage"));
 const KpiPage = lazy(() => import("@/pages/KpiPage"));
 const FocusPage = lazy(() => import("@/pages/FocusPage"));
 const MindMapPage = lazy(() => import("@/pages/MindMapPage"));
@@ -48,6 +49,7 @@ export function AppRouter() {
           <Route path="inbox" element={<InboxPage />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="okr" element={<OkrPage />} />
+          <Route path="review" element={<ReviewPage />} />
           <Route path="kpi" element={<KpiPage />} />
           <Route path="focus" element={<FocusPage />} />
           <Route path="mindmap" element={<MindMapPage />} />
