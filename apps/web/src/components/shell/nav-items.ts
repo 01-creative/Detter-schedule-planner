@@ -5,6 +5,7 @@ import {
   Inbox,
   LayoutGrid,
   Network,
+  NotebookPen,
   Settings,
   Target,
   Timer,
@@ -49,6 +50,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "OKR",
     icon: Target,
     description: "周/月/季目标与可量化的关键结果",
+  },
+  {
+    to: "/review",
+    label: "复盘",
+    icon: NotebookPen,
+    description: "把一周的数据变成一段能读、能喂给 AI 的总结",
   },
   {
     to: "/kpi",
