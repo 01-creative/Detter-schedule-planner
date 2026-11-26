@@ -324,8 +324,13 @@ export async function importTimetablePlan(plan: TimetableImportPlan): Promise<Im
         teacher: planned.teacher,
         color: planned.color,
         semesterStart: plan.semesterStart,
-        // 大学课程默认每周有作业；没有的课可以在课程详情里一键关掉
-        weeklyHomework: true,
+        /*
+         * 默认**不开**「每周有作业」。
+         * 导入一学期课表往往有十几门课，其中体育、马原这类课并没有周作业；
+         * 如果默认打开，全站横幅会一直喊「14 门课还没记作业」，很快就没人看了。
+         * 哪门课确实每周都有作业，在课程详情里打开即可。
+         */
+        weeklyHomework: false,
         note: "由课表导入",
         sortIndex: aliveCourses.length + result.coursesCreated,
       })) as unknown as Course;

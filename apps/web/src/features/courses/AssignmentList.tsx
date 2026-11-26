@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Plus, Trash2, Undo2 } from "lucide-react";
-import { dayKey, dayKeyToTs, DAY, type Assignment, type Course } from "@detter/shared";
+import { dayKey, dayKeyToTs, type Assignment, type Course } from "@detter/shared";
 import { Badge, Button, Input, cn } from "@detter/ui";
 import { assignmentStatusLabel, groupAssignmentsByWeek, weeksUpToCurrent } from "./coursesModel";
 
 /**
- * 每周作业：按周列出 + 快速添加。
+ * 每周作业：按周列出 + 快速添加 + 截止时间可改。
  *
- * 三个细节：
+ * 四个细节：
  * 1. 默认选中「本周」，这样点开就能补记；
- * 2. 缺记的周单独提示（`weeklyHomework` 的课才提示），点一下就把周次填进表单；
- * 3. 每条作业带一个关联的 Task，勾选完成会同步把 Task 标完成（提醒因此消失）。
+ * 2. 缺记的周单独提示（只对 `weeklyHomework` 的课提示），点一下就把周次填进表单；
+ * 3. 每条作业带一个关联的 Task，勾选完成会同步把 Task 标完成（提醒因此消失）；
+ * 4. 截止时间精确到分钟：交作业常常是「周日 23:59」，只给日期不够用；
+ *    已经记下的那条也能点开改，改完连任务的时间一起改（提醒跟着走）。
  */
 export interface AssignmentListProps {
   course: Course;
@@ -19,7 +21,31 @@ export interface AssignmentListProps {
   missingWeeks: number[];
   onAdd: (input: { weekNo: number; title: string; dueAt: number | null }) => void;
   onStatusChange: (assignment: Assignment, status: Assignment["status"]) => void;
+  onDueChange: (assignment: Assignment, dueAt: number | null) => void;
   onDelete: (assignment: Assignment) => void;
+}
+
+/** 默认截止时刻：周日 23:59 是绝大多数教务系统的截止口径。 */
+const DEFAULT_DUE_TIME = "23:59";
+
+function formatDueAt(at: number): string {
+  const date = dayKey(at);
+  const d = new Date(at);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${date} ${hh}:${mm}`;
+}
+
+function timeOfDay(at: number): string {
+  const d = new Date(at);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** 把「日期 + 时刻」拼成本地时间戳；时刻缺省时按当天 23:59。 */
+function composeDue(date: string, time: string): number {
+  const [h, m] = (time || DEFAULT_DUE_TIME).split(":").map(Number);
+  const minutes = (Number.isFinite(h) ? (h as number) : 23) * 60 + (Number.isFinite(m) ? (m as number) : 59);
+  return dayKeyToTs(date, minutes * 60_000);
 }
 
 export function AssignmentList({
@@ -29,12 +55,19 @@ export function AssignmentList({
   missingWeeks,
   onAdd,
   onStatusChange,
+  onDueChange,
   onDelete,
 }: AssignmentListProps) {
   const [title, setTitle] = useState("");
   const [weekNo, setWeekNo] = useState<number>(currentWeek ?? 1);
   const [dueText, setDueText] = useState("");
+  const [dueTime, setDueTime] = useState(DEFAULT_DUE_TIME);
   const [error, setError] = useState("");
+
+  /** 正在改截止时间的那一条 */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editTime, setEditTime] = useState(DEFAULT_DUE_TIME);
 
   // 数据是异步回来的：第一次渲染时 currentWeek 还是 null，等它到了再把默认周次改成「本周」
   useEffect(() => {
@@ -53,11 +86,17 @@ export function AssignmentList({
       setError("写一句作业内容，比如「课后习题 3.1-3.8」");
       return;
     }
-    const dueAt = dueText ? dayKeyToTs(dueText) + DAY - 1 : null;
-    onAdd({ weekNo, title: text, dueAt });
+    onAdd({ weekNo, title: text, dueAt: dueText ? composeDue(dueText, dueTime) : null });
     setTitle("");
     setDueText("");
+    setDueTime(DEFAULT_DUE_TIME);
     setError("");
+  };
+
+  const openEditor = (item: Assignment) => {
+    setEditingId(item.id);
+    setEditDate(item.dueAt !== null ? dayKey(item.dueAt) : dayKey(Date.now()));
+    setEditTime(item.dueAt !== null ? timeOfDay(item.dueAt) : DEFAULT_DUE_TIME);
   };
 
   return (
@@ -109,14 +148,24 @@ export function AssignmentList({
               aria-label="作业内容"
             />
           </label>
-          <label className="min-w-0 sm:w-[150px]">
-            <span className="text-micro text-ink-500">截止（可选）</span>
+          <label className="min-w-0 sm:w-[140px]">
+            <span className="text-micro text-ink-500">截止日期</span>
             <Input
               type="date"
               value={dueText}
               onChange={(event) => setDueText(event.target.value)}
               className="tabular mt-0.5"
               aria-label="作业截止日期"
+            />
+          </label>
+          <label className="min-w-0 sm:w-[110px]">
+            <span className="text-micro text-ink-500">截止时刻</span>
+            <Input
+              type="time"
+              value={dueTime}
+              onChange={(event) => setDueTime(event.target.value)}
+              className="tabular mt-0.5"
+              aria-label="作业截止时刻"
             />
           </label>
           <Button
@@ -149,64 +198,114 @@ export function AssignmentList({
                 {group.items.map((item) => (
                   <li
                     key={item.id}
-                    className="flex items-center gap-2 rounded-md border border-border bg-surface-solid px-2.5 py-1.5"
+                    className="rounded-md border border-border bg-surface-solid px-2.5 py-1.5"
                   >
-                    <button
-                      type="button"
-                      aria-label={item.status === "done" ? "标记为待做" : "标记为已完成"}
-                      aria-pressed={item.status === "done"}
-                      onClick={() => onStatusChange(item, item.status === "done" ? "todo" : "done")}
-                      className={cn(
-                        "flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-[var(--dur-1)]",
-                        item.status === "done"
-                          ? "border-success bg-success text-white"
-                          : "border-border-strong text-transparent hover:border-success",
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        aria-label={item.status === "done" ? "标记为待做" : "标记为已完成"}
+                        aria-pressed={item.status === "done"}
+                        onClick={() => onStatusChange(item, item.status === "done" ? "todo" : "done")}
+                        className={cn(
+                          "flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-[var(--dur-1)]",
+                          item.status === "done"
+                            ? "border-success bg-success text-white"
+                            : "border-border-strong text-transparent hover:border-success",
+                        )}
+                      >
+                        <Check className="size-3" aria-hidden="true" />
+                      </button>
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1 truncate text-caption",
+                          item.status === "done" ? "text-ink-300 line-through" : "text-ink-900",
+                        )}
+                      >
+                        {item.title}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => (editingId === item.id ? setEditingId(null) : openEditor(item))}
+                        aria-label={`修改「${item.title}」的截止时间`}
+                        className={cn(
+                          "tabular shrink-0 rounded px-1.5 py-1 text-micro transition-colors duration-[var(--dur-1)] hover:bg-surface-sunken",
+                          item.dueAt === null ? "text-ink-300" : "text-ink-500",
+                        )}
+                      >
+                        {item.dueAt === null ? "设截止" : formatDueAt(item.dueAt)}
+                      </button>
+                      <span className="shrink-0 text-micro text-ink-300">
+                        {assignmentStatusLabel(item.status)}
+                      </span>
+                      {item.status !== "skipped" ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label={`把「${item.title}」标记为跳过`}
+                          onClick={() => onStatusChange(item, "skipped")}
+                        >
+                          <Undo2 className="size-3.5" aria-hidden="true" />
+                        </Button>
+                      ) : (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label={`恢复「${item.title}」`}
+                          onClick={() => onStatusChange(item, "todo")}
+                        >
+                          <Undo2 className="size-3.5" aria-hidden="true" />
+                        </Button>
                       )}
-                    >
-                      <Check className="size-3" aria-hidden="true" />
-                    </button>
-                    <span
-                      className={cn(
-                        "min-w-0 flex-1 truncate text-caption",
-                        item.status === "done" ? "text-ink-300 line-through" : "text-ink-900",
-                      )}
-                    >
-                      {item.title}
-                    </span>
-                    {item.dueAt !== null && (
-                      <span className="tabular shrink-0 text-micro text-ink-500">{dayKey(item.dueAt)}</span>
-                    )}
-                    <span className="shrink-0 text-micro text-ink-300">
-                      {assignmentStatusLabel(item.status)}
-                    </span>
-                    {item.status !== "skipped" ? (
                       <Button
                         size="icon"
                         variant="ghost"
-                        aria-label={`把「${item.title}」标记为跳过`}
-                        onClick={() => onStatusChange(item, "skipped")}
+                        aria-label={`删除「${item.title}」`}
+                        className="text-ink-300 hover:text-danger-ink"
+                        onClick={() => onDelete(item)}
                       >
-                        <Undo2 className="size-3.5" aria-hidden="true" />
+                        <Trash2 className="size-3.5" aria-hidden="true" />
                       </Button>
-                    ) : (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label={`恢复「${item.title}」`}
-                        onClick={() => onStatusChange(item, "todo")}
-                      >
-                        <Undo2 className="size-3.5" aria-hidden="true" />
-                      </Button>
+                    </div>
+
+                    {editingId === item.id && (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded bg-surface-sunken/60 p-2">
+                        <Input
+                          type="date"
+                          value={editDate}
+                          onChange={(event) => setEditDate(event.target.value)}
+                          className="tabular w-[140px]"
+                          aria-label="新截止日期"
+                        />
+                        <Input
+                          type="time"
+                          value={editTime}
+                          onChange={(event) => setEditTime(event.target.value)}
+                          className="tabular w-[110px]"
+                          aria-label="新截止时刻"
+                        />
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => {
+                            if (!editDate) return;
+                            onDueChange(item, composeDue(editDate, editTime));
+                            setEditingId(null);
+                          }}
+                        >
+                          保存
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            onDueChange(item, null);
+                            setEditingId(null);
+                          }}
+                        >
+                          清除截止
+                        </Button>
+                      </div>
                     )}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label={`删除「${item.title}」`}
-                      className="text-ink-300 hover:text-danger-ink"
-                      onClick={() => onDelete(item)}
-                    >
-                      <Trash2 className="size-3.5" aria-hidden="true" />
-                    </Button>
                   </li>
                 ))}
               </ul>

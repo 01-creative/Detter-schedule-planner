@@ -8,7 +8,7 @@ import {
   type Assignment,
   type Course,
 } from "@detter/shared";
-import { Badge, Button, Card, Dialog, useToast } from "@detter/ui";
+import { Badge, Button, Card, Dialog, Switch, useToast } from "@detter/ui";
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { useActiveGoals } from "@/db/hooks";
@@ -316,6 +316,24 @@ export function CourseDetailView() {
             )}
           </span>
         </div>
+
+        {/* 每门课的作业习惯不同：放在这里比藏进编辑弹窗里更容易找到 */}
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-sunken/60 px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-caption text-ink-900">这门课每周都有作业</p>
+            <p className="text-micro text-ink-300">
+              打开后，某一周没有记录会出现在「还没记作业」提示里
+            </p>
+          </div>
+          <Switch
+            checked={course.weeklyHomework}
+            onCheckedChange={(checked) =>
+              void updateCourseRecord(course, { weeklyHomework: checked })
+            }
+            label="这门课每周都有作业"
+          />
+        </div>
+
         <AssignmentList
           course={course}
           assignments={courseAssignments}
@@ -323,6 +341,9 @@ export function CourseDetailView() {
           missingWeeks={missingWeeks}
           onAdd={(input) => void handleAddAssignment(input)}
           onStatusChange={(assignment, next) => void handleAssignmentStatus(assignment, next)}
+          onDueChange={(assignment, dueAt) =>
+            void updateAssignmentRecord(course, assignment, { dueAt })
+          }
           onDelete={(assignment) => void handleDeleteAssignment(assignment)}
         />
       </Card>
