@@ -23,6 +23,7 @@ import {
   edgePath,
   layoutMindMap,
   type LayoutNode,
+  type MindLayout,
 } from "./layout";
 import {
   findNodeAt,
@@ -384,6 +385,23 @@ export function MindMapStage({
     [layout],
   );
 
+  /**
+   * 用一份「刚算出来的布局」直接重画与拖动节点相连的边。
+   *
+   * 为什么需要：松手后位置要经过 patchNode → Dexie → live query → 重新布局 → 重渲染，
+   * 这一圈是异步的；在这中间连线还停在上一次渲染的路径上，看起来就是「线飞了」。
+   * 落点已经由本地 layoutMindMap 算过一遍，直接拿它画，视觉上就没有空窗期。
+   */
+  const paintEdgesFromLayout = useCallback((drag: DragSession, nextLayout: MindLayout) => {
+    for (const edge of drag.edges) {
+      if (!edge.el) continue;
+      const from = nextLayout.byId.get(edge.fromId);
+      const to = nextLayout.byId.get(edge.toId);
+      if (!from || !to) continue;
+      edge.el.setAttribute("d", edgePath(from, to));
+    }
+  }, []);
+
   const finishDrag = useCallback(
     (event: PointerEvent) => {
       const drag = dragRef.current;
@@ -434,6 +452,7 @@ export function MindMapStage({
           if (placed && drag.element) {
             drag.element.style.transform = `translate3d(${placed.x}px, ${placed.y}px, 0)`;
           }
+          paintEdgesFromLayout(drag, optimistic);
           return;
         }
         if (check.reason !== "same-parent") {
@@ -456,8 +475,9 @@ export function MindMapStage({
       if (placed && drag.element) {
         drag.element.style.transform = `translate3d(${placed.x}px, ${placed.y}px, 0)`;
       }
+      paintEdgesFromLayout(drag, optimistic);
     },
-    [layout, nodes, toast],
+    [layout, nodes, paintEdgesFromLayout, toast],
   );
 
   const beginNodeDrag = useCallback(
