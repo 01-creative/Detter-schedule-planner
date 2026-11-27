@@ -10,6 +10,7 @@ import {
   type Assignment,
   type AssignmentStatus,
   type Course,
+  type Task,
   type TimetableImportPlan,
 } from "@detter/shared";
 import { db } from "@/db";
@@ -272,6 +273,8 @@ export interface ImportResult {
   coursesReused: number;
   seriesCreated: number;
   seriesSkipped: number;
+  /** 重复导入时，因作息表改过而更新了时间的时段数 */
+  seriesUpdated: number;
   taskIds: string[];
   warnings: string[];
 }
@@ -289,6 +292,7 @@ export async function importTimetablePlan(plan: TimetableImportPlan): Promise<Im
     coursesReused: 0,
     seriesCreated: 0,
     seriesSkipped: 0,
+    seriesUpdated: 0,
     taskIds: [],
     warnings: [...plan.warnings],
   };
@@ -299,12 +303,13 @@ export async function importTimetablePlan(plan: TimetableImportPlan): Promise<Im
     db.tasks.toArray(),
   ]);
   const aliveCourses = existingCourses.filter((row) => !row.deletedAt);
-  const taken = new Set<string>();
+  /** 已经导过的时段：key → 那条日程，重复导入时用它比对新旧时间 */
+  const taken = new Map<string, Task>();
   for (const task of existingTasks) {
     if (task.deletedAt) continue;
     const courseTag = task.tags.find((tag) => tag.startsWith("course:"));
     const slotTag = task.tags.find((tag) => tag.startsWith("slot:"));
-    if (courseTag && slotTag) taken.add(`${courseTag}|${slotTag}`);
+    if (courseTag && slotTag) taken.set(`${courseTag}|${slotTag}`, task);
   }
 
   for (const planned of plan.courses) {
@@ -341,17 +346,38 @@ export async function importTimetablePlan(plan: TimetableImportPlan): Promise<Im
     for (const slot of planned.slots) {
       for (const series of slot.series) {
         const key = `course:${course.id}|slot:${series.key}`;
-        if (taken.has(key)) {
-          result.seriesSkipped += 1;
+        const existing = taken.get(key);
+
+        if (existing) {
+          /*
+           * 同一个时段导过第二次：默认跳过，但**时间变了要更新**。
+           * 典型场景是学校作息表填错了（比如第 12 节缺失导致 10-12 节被算成 20:40 下课），
+           * 用户在设置里改好作息后再导一次，应该把已有日程的时间纠正过来，而不是「跳过」。
+           */
+          const draft = classTaskDraft(course, series, slot, { source: "import" });
+          if (draft.startAt !== existing.startAt || draft.endAt !== existing.endAt) {
+            await saveEntity("task", {
+              ...existing,
+              startAt: draft.startAt,
+              endAt: draft.endAt,
+              title: draft.title,
+              location: draft.location,
+              rrule: series.rrule,
+            });
+            result.seriesUpdated = (result.seriesUpdated ?? 0) + 1;
+          } else {
+            result.seriesSkipped += 1;
+          }
           continue;
         }
+
         const task = await saveEntity("task", {
           ...classTaskDraft(course, series, slot, { source: "import" }),
           rrule: series.rrule,
           recurrenceId: null,
           occurrenceKey: null,
         });
-        taken.add(key);
+        taken.set(key, task as unknown as Task);
         result.taskIds.push(String(task.id));
         result.seriesCreated += 1;
       }

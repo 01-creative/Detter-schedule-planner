@@ -1,15 +1,21 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { Layers, Plus } from "lucide-react";
+import { ChevronDown, Layers, Plus } from "lucide-react";
 import type { Goal, GoalKind, Quadrant, Task } from "@detter/shared";
 import { QUADRANT_META } from "@detter/shared";
 import { Button, Tabs, cn, useToast } from "@detter/ui";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useQuadrantDrag } from "@/features/quadrant/DragProvider";
 import { setTaskDone } from "@/features/quadrant/task-actions";
 import { useBoardGoals, useBoardTasks } from "@/features/quadrant/queries";
 import { TemplateDialog } from "./TemplateDialog";
 import { GoalCard } from "./GoalCard";
-import { expandTemplate, saveGoalOrder, toggleGoalMilestone } from "./goal-actions";
+import {
+  deleteGoalKeepTasks,
+  expandTemplate,
+  saveGoalOrder,
+  toggleGoalMilestone,
+} from "./goal-actions";
 import { useGoalDialogStore } from "./goal-dialog";
 import {
   goalsOfKind,
@@ -53,10 +59,15 @@ export function GoalRail({ onCollapse, embedded = false, className }: GoalRailPr
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reorderId, setReorderId] = useState<string | null>(null);
   const [templateGoal, setTemplateGoal] = useState<Goal | null>(null);
+  /** 待确认删除的目标 */
+  const [deleteTarget, setDeleteTarget] = useState<Goal | null>(null);
+  /** 「未关联目标」是否展开 */
+  const [unlinkedOpen, setUnlinkedOpen] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
 
   const tasksByGoal = useMemo(() => groupTasksByGoal(tasks), [tasks]);
-  const unlinkedCount = useMemo(() => tasks.filter((task) => !task.goalId).length, [tasks]);
+  const unlinkedTasks = useMemo(() => tasks.filter((task) => !task.goalId), [tasks]);
+  const unlinkedCount = unlinkedTasks.length;
   const visible = useMemo(() => goalsOfKind(goals, tab), [goals, tab]);
   const tabCounts = useMemo(
     () => ({
@@ -219,6 +230,7 @@ export function GoalRail({ onCollapse, embedded = false, className }: GoalRailPr
                 onToggleMilestone={(item, milestoneId) => {
                   void toggleGoalMilestone(item, milestoneId);
                 }}
+                onDelete={(item) => setDeleteTarget(item)}
               />
             );
           })}
@@ -236,10 +248,36 @@ export function GoalRail({ onCollapse, embedded = false, className }: GoalRailPr
          * 用户就会觉得「我明明有一屏任务，右边怎么什么都没有」。
          */}
         {unlinkedCount > 0 && (
-          <div className="mt-2 flex items-center gap-2 rounded-lg border border-dashed border-border-strong px-2.5 py-1.5">
-            <span className="size-1.5 shrink-0 rounded-full bg-ink-300" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate text-caption text-ink-500">未关联目标</span>
-            <span className="tabular shrink-0 text-micro text-ink-300">{unlinkedCount} 项</span>
+          <div className="mt-2 rounded-lg border border-dashed border-border-strong">
+            <button
+              type="button"
+              onClick={() => setUnlinkedOpen((open) => !open)}
+              aria-expanded={unlinkedOpen}
+              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left"
+            >
+              <span className="size-1.5 shrink-0 rounded-full bg-ink-300" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate text-caption text-ink-500">未关联目标</span>
+              <span className="tabular shrink-0 text-micro text-ink-300">{unlinkedCount} 项</span>
+              <ChevronDown
+                className={cn(
+                  "size-3.5 shrink-0 text-ink-300 transition-transform duration-[var(--dur-1)]",
+                  unlinkedOpen && "rotate-180",
+                )}
+                aria-hidden="true"
+              />
+            </button>
+            {unlinkedOpen && (
+              <ul className="space-y-0.5 border-t border-border px-2.5 py-1.5">
+                {unlinkedTasks.slice(0, 12).map((task) => (
+                  <li key={task.id} className="truncate text-micro text-ink-500">
+                    · {task.title}
+                  </li>
+                ))}
+                {unlinkedTasks.length > 12 && (
+                  <li className="text-micro text-ink-300">还有 {unlinkedTasks.length - 12} 条…</li>
+                )}
+              </ul>
+            )}
           </div>
         )}
         {unlinkedCount > 0 && (
@@ -265,6 +303,29 @@ export function GoalRail({ onCollapse, embedded = false, className }: GoalRailPr
         goal={templateGoal}
         onClose={() => setTemplateGoal(null)}
         onConfirm={handleTemplateConfirm}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={deleteTarget ? `删除目标「${deleteTarget.title}」？` : "删除目标？"}
+        description="目标下的任务会保留，只是不再关联它；它们会出现在「未关联目标」里，可以再挂到别的目标上。"
+        confirmLabel="删除"
+        tone="danger"
+        onConfirm={() => {
+          const target = deleteTarget;
+          setDeleteTarget(null);
+          if (!target) return;
+          void deleteGoalKeepTasks(target).then((count) => {
+            toast({
+              title: "目标已删除",
+              description: count > 0 ? `${count} 个任务已解除关联` : undefined,
+              tone: "success",
+            });
+          });
+        }}
       />
     </div>
   );

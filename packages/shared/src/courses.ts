@@ -36,7 +36,14 @@ export interface PeriodTime {
   end: string;
 }
 
-/** 川大江安校区作息（11 节）。设置页与导入预览都以它为默认值。 */
+/**
+ * 川大江安校区作息（12 节）。设置页与导入预览都以它为默认值。
+ *
+ * 为什么是 12 节：晚间大节实际排到「10-12节」，只写 11 节的话
+ * 第 12 节的课会被算成第 10 节下课（用户报过这个问题）。
+ * 晚间四节按 45 分钟一节、5 分钟课间铺开，10-12 节正好 19:30–21:55。
+ * 各校区作息并不统一，设置页里可以逐节改。
+ */
 export const DEFAULT_PERIOD_TIMES: readonly PeriodTime[] = [
   { start: "08:00", end: "08:45" },
   { start: "08:55", end: "09:40" },
@@ -46,9 +53,10 @@ export const DEFAULT_PERIOD_TIMES: readonly PeriodTime[] = [
   { start: "14:55", end: "15:40" },
   { start: "16:00", end: "16:45" },
   { start: "16:55", end: "17:40" },
-  { start: "19:00", end: "19:45" },
-  { start: "19:55", end: "20:40" },
-  { start: "20:50", end: "21:35" },
+  { start: "18:40", end: "19:25" },
+  { start: "19:30", end: "20:15" },
+  { start: "20:20", end: "21:05" },
+  { start: "21:10", end: "21:55" },
 ];
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;

@@ -1,6 +1,7 @@
 import { shortId, uuidv7 } from "@detter/shared";
 import type { Goal, GoalInput, GoalKind, Quadrant, Task } from "@detter/shared";
-import { getEntity, saveEntity } from "@/db/repo";
+import { getEntity, deleteEntity, saveEntity } from "@/db/repo";
+import { db } from "@/db";
 import {
   buildGoalTaskInput,
   buildTemplateTaskInputs,
@@ -121,4 +122,21 @@ export function toggleGoalMilestone(goal: Goal, milestoneId: string): Promise<Go
       milestone.id === milestoneId ? { ...milestone, done: !milestone.done } : milestone,
     ),
   });
+}
+
+/**
+ * 删除目标。
+ *
+ * 语义选择：**只删目标，不删它下面的任务**。
+ * 任务往往已经排进日历、绑了提醒，因为目标作废就把它们一起清掉太危险；
+ * 保留任务但解除关联（goalId 置空），它们会回到「未关联目标」那一桶，随时能再挂到别处。
+ */
+export async function deleteGoalKeepTasks(goal: Goal): Promise<number> {
+  const tasks = await db.tasks.where("goalId").equals(goal.id).toArray();
+  const alive = tasks.filter((task) => !task.deletedAt);
+  for (const task of alive) {
+    await saveEntity("task", { ...task, goalId: null });
+  }
+  await deleteEntity("goal", goal.id);
+  return alive.length;
 }

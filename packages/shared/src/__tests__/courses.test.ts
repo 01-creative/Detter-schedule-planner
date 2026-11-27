@@ -73,7 +73,9 @@ describe("作息表与节次换算", () => {
   it("默认江安作息：1-2 节 08:00-09:40", () => {
     expect(resolvePeriodWindow(DEFAULT_PERIOD_TIMES, 1, 2)).toEqual({ start: "08:00", end: "09:40" });
     expect(resolvePeriodWindow(DEFAULT_PERIOD_TIMES, 5, 7)).toEqual({ start: "14:00", end: "16:45" });
-    expect(resolvePeriodWindow(DEFAULT_PERIOD_TIMES, 11, 11)).toEqual({ start: "20:50", end: "21:35" });
+    expect(resolvePeriodWindow(DEFAULT_PERIOD_TIMES, 11, 11)).toEqual({ start: "20:20", end: "21:05" });
+    // 晚间大节排到第 12 节：10-12 节必须收在 21:55（用户报过 20:40 的错误下课时间）
+    expect(resolvePeriodWindow(DEFAULT_PERIOD_TIMES, 10, 12)).toEqual({ start: "19:30", end: "21:55" });
   });
 
   it("改过的作息表立即生效，坏项回落默认", () => {
@@ -86,8 +88,8 @@ describe("作息表与节次换算", () => {
     expect(resolvePeriodWindow(custom, 2, 2)).toEqual({ start: "08:55", end: "09:40" });
   });
 
-  it("非数组/缺项时得到完整 11 节默认值", () => {
-    expect(normalizePeriodTimes(null)).toHaveLength(11);
+  it("非数组/缺项时得到完整 12 节默认值", () => {
+    expect(normalizePeriodTimes(null)).toHaveLength(12);
     expect(normalizePeriodTimes([])[0]).toEqual(DEFAULT_PERIOD_TIMES[0]);
   });
 });
@@ -172,7 +174,8 @@ describe("课表 → 导入计划", () => {
       { semesterStart: SEMESTER },
     );
     expect(single.courses[0]?.slots[0]?.series[0]?.rrule).toBeNull();
-    expect(single.courses[0]?.slots[0]?.series[0]?.startAt).toBe(new Date(2026, 9, 7, 19, 0).getTime());
+    // 第 9 节按默认作息是 18:40 开始
+    expect(single.courses[0]?.slots[0]?.series[0]?.startAt).toBe(new Date(2026, 9, 7, 18, 40).getTime());
   });
 
   it("学期起点不合法时不生成任何日程，并给出警告", () => {

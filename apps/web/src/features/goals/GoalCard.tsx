@@ -29,6 +29,7 @@ export interface GoalCardProps {
   onExpandTemplate: (goal: Goal) => void;
   onToggleTask: (task: Task) => void;
   onToggleMilestone: (goal: Goal, milestoneId: string) => void;
+  onDelete?: (goal: Goal) => void;
 }
 
 export function GoalCard({
@@ -45,6 +46,7 @@ export function GoalCard({
   onExpandTemplate,
   onToggleTask,
   onToggleMilestone,
+  onDelete,
 }: GoalCardProps) {
   const option = goalIconOption(goal.icon);
   const Icon = option.Icon;
@@ -138,13 +140,24 @@ export function GoalCard({
       )}
 
       {expanded && (
-        <GoalDetail
-          goal={goal}
-          tasks={tasks}
-          stats={stats}
-          onToggleTask={onToggleTask}
-          onToggleMilestone={(milestoneId) => onToggleMilestone(goal, milestoneId)}
-        />
+        <>
+          <GoalDetail
+            goal={goal}
+            tasks={tasks}
+            stats={stats}
+            onToggleTask={onToggleTask}
+            onToggleMilestone={(milestoneId) => onToggleMilestone(goal, milestoneId)}
+          />
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(goal)}
+              className="mt-2 w-full rounded-md px-2 py-1.5 text-left text-micro text-danger-ink transition-colors duration-[var(--dur-1)] hover:bg-danger-soft"
+            >
+              删除目标（下面的任务保留）
+            </button>
+          )}
+        </>
       )}
     </li>
   );
