@@ -56,6 +56,7 @@ export function GoalRail({ onCollapse, embedded = false, className }: GoalRailPr
   const listRef = useRef<HTMLUListElement>(null);
 
   const tasksByGoal = useMemo(() => groupTasksByGoal(tasks), [tasks]);
+  const unlinkedCount = useMemo(() => tasks.filter((task) => !task.goalId).length, [tasks]);
   const visible = useMemo(() => goalsOfKind(goals, tab), [goals, tab]);
   const tabCounts = useMemo(
     () => ({
@@ -227,6 +228,24 @@ export function GoalRail({ onCollapse, embedded = false, className }: GoalRailPr
           <div className="mt-1 rounded-lg border border-dashed border-border-strong px-3 py-5 text-center">
             <p className="text-micro text-ink-500">{EMPTY_HINT[tab]}</p>
           </div>
+        )}
+
+        {/*
+         * 「未关联」这一桶是为了让平面上的点能对上账：
+         * 上面每张卡只显示挂了目标的点，剩下的灰点如果没有任何地方交代，
+         * 用户就会觉得「我明明有一屏任务，右边怎么什么都没有」。
+         */}
+        {unlinkedCount > 0 && (
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-dashed border-border-strong px-2.5 py-1.5">
+            <span className="size-1.5 shrink-0 rounded-full bg-ink-300" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-caption text-ink-500">未关联目标</span>
+            <span className="tabular shrink-0 text-micro text-ink-300">{unlinkedCount} 项</span>
+          </div>
+        )}
+        {unlinkedCount > 0 && (
+          <p className="mt-1 px-1 text-micro text-ink-300">
+            这些点还没挂目标：在任务详情里选一个，或把目标拖到平面上。
+          </p>
         )}
       </div>
 

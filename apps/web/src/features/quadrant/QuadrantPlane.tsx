@@ -20,9 +20,11 @@ import { InlineComposer } from "./InlineComposer";
 import type { BoardStats } from "./stats";
 import type { PlaneLabelLayout } from "./types";
 import {
+  DEFAULT_PLANE_POSITION,
   clampPlanePoint,
   coordinateReadout,
   layoutPlaneLabels,
+  nextFreePlanePosition,
   quadrantFromPosition,
   resolveTaskPoint,
   unitFromPoint,
@@ -196,10 +198,31 @@ export function QuadrantPlane({
     return map;
   }, [tasks]);
 
+  /**
+   * 重合的点自动散开。
+   *
+   * 批量生成的任务（课表导入的作业、AI 一次性写进来的几条）都会落在同一个默认坐标上，
+   * 不散开就会叠成一个点、标签挤成一列——看起来像渲染坏了。
+   * 这里用与「新建任务」相同的黄金角螺旋做一次确定性摊开：
+   * 只影响显示，不改库；用户把点拖走后，落库的就是真实坐标。
+   */
+  const shownPoints = useMemo(() => {
+    const placed: PlanePoint[] = [];
+    const map = new Map<string, PlanePoint>();
+    const ordered = [...tasks].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+    for (const task of ordered) {
+      const base = basePoints.get(task.id) ?? DEFAULT_PLANE_POSITION;
+      const point = nextFreePlanePosition(placed, base);
+      map.set(task.id, point);
+      placed.push(point);
+    }
+    return map;
+  }, [basePoints, tasks]);
+
   const markers = useMemo(
     () =>
       tasks.map((task) => {
-        const base = basePoints.get(task.id) ?? { x: 0.44, y: 0.44 };
+        const base = shownPoints.get(task.id) ?? { x: 0.44, y: 0.44 };
         const dragPoint = drag && drag.taskId === task.id ? drag : null;
         const previewPoint =
           preview && preview.taskId === task.id ? { x: preview.posX, y: preview.posY } : null;

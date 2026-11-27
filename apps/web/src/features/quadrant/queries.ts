@@ -15,13 +15,27 @@ export interface LiveBoard<T> {
   loading: boolean;
 }
 
-export function useBoardTasks(): LiveBoard<Task[]> {
+export interface BoardTaskOptions {
+  /**
+   * 是否把 `kind: "event"` 也算进平面。
+   *
+   * 默认 false：平面回答的是「这件事多重要、多急」，而上课/会议这类**时间已经定死**的日程
+   * 没有可权衡的余地——它们只该出现在日历里。课表导入生成的正是 event，
+   * 之前它们被画成点，导致一屏全是课程、真正要做的事反而被淹没。
+   */
+  includeEvents?: boolean;
+}
+
+export function useBoardTasks(options: BoardTaskOptions = {}): LiveBoard<Task[]> {
+  const includeEvents = options.includeEvents ?? false;
   const data = useLiveQuery(
     async () => {
       const rows = await db.tasks.toArray();
-      return rows.filter((row) => !row.deletedAt);
+      return rows.filter(
+        (row) => !row.deletedAt && (includeEvents || row.kind !== "event"),
+      );
     },
-    [],
+    [includeEvents],
     undefined,
   );
   return { data: data ?? [], loading: data === undefined };
